@@ -31,8 +31,12 @@ WHISPER_MODEL = "medium"
 
 WHISPER_OPTIONS: dict = {
     "language": "fr",
-    "temperature": 0.0,  # -tp 0.0  — décodage glouton, sans fallback
-    "compression_ratio_threshold": 3.0,  # -et 3.0  — seuil entropie/compression pour fallback
+    "temperature": (
+        0.0,
+        0.2,
+        0.4,
+    ),  # glouton en priorité, fallback léger si segment dégradé
+    "compression_ratio_threshold": 2.8,  # seuil actif (défaut Whisper : 2.4, légèrement assoupli)
     "max_context": 64,  # -mc 64   — tokens de contexte précédent max
 }
 
