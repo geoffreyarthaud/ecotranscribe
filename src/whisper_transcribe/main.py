@@ -38,8 +38,8 @@ WHISPER_OPTIONS: dict = {
         0.4,
     ),  # glouton en priorité, fallback léger si segment dégradé
     "compression_ratio_threshold": 2.8,  # seuil actif (défaut Whisper : 2.4, légèrement assoupli)
-    "max_context": 64,  # -mc 64   — tokens de contexte précédent max
     # fp16 : défini dynamiquement selon le device (voir get_device())
+    # max_context n'existe pas dans l'API Python openai-whisper (spécifique à whisper.cpp)
 }
 
 
@@ -220,7 +220,7 @@ def main() -> None:
     tmp_audio: Optional[Path] = None
 
     if is_video_file(input_path):
-        print(f"\n🎬 Fichier vidéo détecté. Extraction de l'audio en cours…")
+        print("\n🎬 Fichier vidéo détecté. Extraction de l'audio en cours…")
         fd, tmp_name = tempfile.mkstemp(suffix=".wav")
         os.close(fd)
         tmp_audio = Path(tmp_name)
@@ -251,6 +251,9 @@ def main() -> None:
         options["fp16"] = device in ("mps", "cuda")
         if initial_prompt:
             options["initial_prompt"] = initial_prompt
+            # carry_initial_prompt : réinjecte le prompt à chaque chunk de 30 s
+            # (sans ça, le prompt ne s'applique qu'aux 30 premières secondes)
+            options["carry_initial_prompt"] = True
 
         print(f"🎙️  Transcription de '{input_path.name}' en cours…")
         if initial_prompt:
@@ -268,7 +271,7 @@ def main() -> None:
         txt_writer = get_writer("txt", str(output_dir))
         txt_writer(result, str(input_path), {})
 
-        print(f"\n✅ Transcription terminée !")
+        print("\n✅ Transcription terminée !")
         print(f"   📄 SRT : {srt_path}")
         print(f"   📝 TXT : {txt_path}")
 
