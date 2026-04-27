@@ -22,6 +22,7 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 
+import torch
 import whisper
 from whisper.utils import get_writer
 
@@ -38,7 +39,26 @@ WHISPER_OPTIONS: dict = {
     ),  # glouton en priorité, fallback léger si segment dégradé
     "compression_ratio_threshold": 2.8,  # seuil actif (défaut Whisper : 2.4, légèrement assoupli)
     "max_context": 64,  # -mc 64   — tokens de contexte précédent max
+    # fp16 : défini dynamiquement selon le device (voir get_device())
 }
+
+
+# ── Device ─────────────────────────────────────────────────────────────────────
+
+
+def get_device() -> str:
+    """
+    Sélectionne le meilleur device disponible :
+      MPS  (Apple Silicon — GPU intégré via Metal)
+      CUDA (NVIDIA)
+      CPU  (fallback)
+    """
+    if torch.backends.mps.is_available():
+        return "mps"
+    if torch.cuda.is_available():
+        return "cuda"
+    return "cpu"
+
 
 # ── Extensions ─────────────────────────────────────────────────────────────────
 
@@ -215,10 +235,20 @@ def main() -> None:
 
     # ── Transcription ──────────────────────────────────────────────────────────
     try:
-        print(f"\n🤖 Chargement du modèle Whisper '{WHISPER_MODEL}'…")
-        model = whisper.load_model(WHISPER_MODEL)
+        device = get_device()
+        device_label = {
+            "mps": "MPS — Apple Silicon ⚡",
+            "cuda": "CUDA — GPU NVIDIA ⚡",
+            "cpu": "CPU",
+        }[device]
+        print(
+            f"\n🤖 Chargement du modèle Whisper '{WHISPER_MODEL}' sur {device_label}…"
+        )
+        model = whisper.load_model(WHISPER_MODEL, device=device)
 
         options = dict(WHISPER_OPTIONS)
+        # fp16 accéléré sur MPS et CUDA ; CPU doit rester en fp32
+        options["fp16"] = device in ("mps", "cuda")
         if initial_prompt:
             options["initial_prompt"] = initial_prompt
 
