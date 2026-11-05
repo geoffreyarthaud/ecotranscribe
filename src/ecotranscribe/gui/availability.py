@@ -13,6 +13,7 @@ from .. import __version__
 from ..core.config import (
     FLAVOR,
     OPENROUTER_MODEL,
+    PROJECT_URL,
     WHISPER_LITE_REASON,
 )
 from ..core.media import resolve_tool, tool_version
@@ -51,6 +52,17 @@ def _build_date() -> str:
     if _DEFAULT_BUILD_DATE:
         return _DEFAULT_BUILD_DATE
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def build_info() -> dict:
+    return {
+        "version": __version__,
+        "flavor": FLAVOR,
+        "commit": _commit(),
+        "build_date": _build_date(),
+        "license": "MIT",
+        "source": PROJECT_URL,
+    }
 
 
 def collect_diagnostic() -> dict:
