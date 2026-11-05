@@ -58,7 +58,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libfuse2
+          sudo apt-get install -y libfuse2 squashfs-tools desktop-file-utils
 
       - name: Install Inno Setup (optional)
         if: runner.os == 'Windows'
@@ -232,7 +232,7 @@ jobs:
         shell: bash
         run: |
           cd release
-          cat SHA256SUMS-*.txt | sort -k2 > SHA256SUMS.txt
+          cat SHA256SUMS-*.txt | tr -d '\r' | sort -k2 > SHA256SUMS.txt
           rm SHA256SUMS-*.txt
           echo "Artefacts publiés :"
           ls -l

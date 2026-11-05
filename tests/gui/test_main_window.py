@@ -377,6 +377,20 @@ def test_progress_determinate_and_indeterminate(
     assert "Extraction" in window.phase_label.text()
 
 
+def test_done_sets_full_progress_bar(
+    qtbot, app_settings: AppSettings
+) -> None:
+    window = _window(app_settings)
+    qtbot.addWidget(window)
+    window.on_worker_progress(
+        ProgressUpdate("transcribing", 120.0, 120.0, "Tranche 1/1")
+    )
+    window.on_worker_progress(ProgressUpdate("done", detail="Terminé"))
+    assert window.progress_bar.maximum() == 1000
+    assert window.progress_bar.value() == 1000
+    assert "100 %" in window.progress_bar.format()
+
+
 def test_writing_phase_disables_cancel(
     qtbot, app_settings: AppSettings
 ) -> None:

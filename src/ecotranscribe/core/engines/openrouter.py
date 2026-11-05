@@ -19,10 +19,9 @@ from ..config import (
     OPENROUTER_CUT_SEARCH_WINDOW,
     OPENROUTER_MAX_RETRIES,
     OPENROUTER_MIN_CHUNK_SECONDS,
-    OPENROUTER_MODEL,
     OPENROUTER_REQUEST_TIMEOUT,
 )
-from ..errors import CancelledError, EngineUnavailableError, TranscribeError
+from ..errors import EngineUnavailableError, TranscribeError
 from ..models import (
     CancelToken,
     EngineAvailability,

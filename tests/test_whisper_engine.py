@@ -157,6 +157,35 @@ def test_transcribe_stops_when_cancelled(
     assert called is False
 
 
+def test_cancelled_duration_is_not_swallowed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        whisper_engine,
+        "whisper_availability",
+        lambda: EngineAvailability(True),
+    )
+    monkeypatch.setattr(
+        whisper_engine.media, "is_video_file", lambda *a, **k: False
+    )
+
+    def cancelled(*args: object, **kwargs: object) -> float:
+        raise CancelledError()
+
+    monkeypatch.setattr(whisper_engine.media, "get_media_duration", cancelled)
+    called = False
+
+    def loader() -> object:
+        nonlocal called
+        called = True
+        return object()
+
+    engine = WhisperEngine(loader=loader, device_fn=lambda: "cpu")
+    with pytest.raises(CancelledError):
+        engine.transcribe(_request(tmp_path), cancel=CancelToken())
+    assert called is False
+
+
 def test_transcribe_requires_available_engine(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -179,6 +179,26 @@ def test_confirmed_overwrite_sets_flag(
     assert request.overwrite is True
 
 
+def test_unexpected_service_error_exits_one(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    class CrashService(FakeService):
+        def transcribe(
+            self, request, *, on_progress=None, on_log=None, cancel=None
+        ):
+            raise RuntimeError("boum")
+
+    monkeypatch.setattr(cli, "TranscribeService", CrashService)
+    with pytest.raises(SystemExit) as error:
+        cli.main([str(_source(tmp_path))])
+    assert error.value.code == 1
+    stderr = capsys.readouterr().err
+    assert "La transcription a échoué" in stderr
+    assert "boum" in stderr
+
+
 def test_missing_cost_is_reported(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

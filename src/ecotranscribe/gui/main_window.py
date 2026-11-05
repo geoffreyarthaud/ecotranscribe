@@ -48,7 +48,7 @@ from ..core.config import (
     WHISPER_LITE_REASON,
 )
 from ..core.engines.openrouter import OpenRouterEngine
-from ..core.errors import InvalidRequestError, TranscribeError
+from ..core.errors import InvalidRequestError
 from ..core.formatting import format_seconds
 from ..core.models import (
     CancelToken,
@@ -61,7 +61,7 @@ from ..core.models import (
 from ..core.outputs import existing_outputs, output_paths
 from ..core.prompts import resolve_prompt
 from ..core.service import TranscribeService
-from .availability import build_info, whisper_availability
+from .availability import build_info
 from .dialogs import DialogService
 from .settings import AppSettings, KeyStore
 from .worker import TranscribeWorker
@@ -324,7 +324,8 @@ class MainWindow(QMainWindow):
         self.phase_label = QLabel("Choisissez un fichier")
         self.phase_label.setWordWrap(True)
         self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 0)
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
         self.progress_bar.setTextVisible(True)
         self.elapsed_label = QLabel("")
         self.elapsed_label.setStyleSheet("color: #4b5563;")
@@ -857,13 +858,9 @@ class MainWindow(QMainWindow):
             self._update_elapsed()
             return
         if update.phase == "done":
-            if update.total is not None and update.total > 0:
-                self.progress_bar.setRange(0, 1000)
-                self.progress_bar.setValue(1000)
-                self.progress_bar.setFormat("100 %")
-            else:
-                self.progress_bar.setRange(0, 0)
-                self.progress_bar.setFormat("")
+            self.progress_bar.setRange(0, 1000)
+            self.progress_bar.setValue(1000)
+            self.progress_bar.setFormat("100 %")
             self.phase_label.setText("Terminé")
             self._update_elapsed()
             return
@@ -890,6 +887,12 @@ class MainWindow(QMainWindow):
             self.phase_label.setText(
                 f"{label} — {detail}" if detail and detail != label else label
             )
+        if (
+            self._cancel_token is not None
+            and self._cancel_token.is_cancelled()
+            and self._running
+        ):
+            self.status_label.setText("Annulation en cours…")
         self._update_elapsed()
 
     def _update_elapsed(self) -> None:
@@ -940,6 +943,11 @@ class MainWindow(QMainWindow):
     def on_worker_failed(self, message: str, detail: str) -> None:
         self._finish_task()
         self.status_label.setText("Échec de la transcription")
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat("")
+        self.phase_label.clear()
+        self.elapsed_label.clear()
         self.open_folder_button.setEnabled(False)
         full_detail = detail or ""
         journal = self.log_view.toPlainText()[-4000:]
@@ -955,6 +963,11 @@ class MainWindow(QMainWindow):
     def on_worker_cancelled(self) -> None:
         self._finish_task()
         self.status_label.setText("Transcription annulée.")
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat("")
+        self.phase_label.clear()
+        self.elapsed_label.clear()
         self.result_paths_label.setText("")
         self.cost_label.setText("")
         self.open_folder_button.setEnabled(False)
@@ -1048,6 +1061,15 @@ class MainWindow(QMainWindow):
             if self._input_path is not None
             else "Choisissez un fichier"
         )
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat("")
+        self.phase_label.setText(
+            "Prêt à transcrire"
+            if self._input_path is not None
+            else "Choisissez un fichier"
+        )
+        self.elapsed_label.clear()
         self.result_paths_label.setText("")
         self.cost_label.setText("")
         self.open_folder_button.setEnabled(False)

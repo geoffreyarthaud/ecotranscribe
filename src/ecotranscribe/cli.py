@@ -86,6 +86,7 @@ class RichReporter:
             expand=True,
         )
         self.task_id = None
+        self._last_total = 0.0
 
     def __enter__(self) -> "RichReporter":
         self.progress.__enter__()
@@ -107,6 +108,18 @@ class RichReporter:
         detail = update.detail.strip()
         phase = f"{label} — {detail}" if detail and detail != label else label
         if update.total is None or update.total <= 0:
+            if update.phase == "done" and self._last_total > 0:
+                self.progress.update(
+                    self.task_id,
+                    total=self._last_total,
+                    completed=self._last_total,
+                    phase="Terminé",
+                    audio_pos=(
+                        f"{format_seconds(self._last_total)} / "
+                        f"{format_seconds(self._last_total)}"
+                    ),
+                )
+                return
             self.progress.update(
                 self.task_id,
                 total=None,
@@ -115,6 +128,7 @@ class RichReporter:
                 audio_pos="",
             )
             return
+        self._last_total = update.total
         self.progress.update(
             self.task_id,
             total=update.total,
@@ -241,6 +255,12 @@ def main(argv: Sequence[str] | None = None) -> None:
         print(f"\nErreur : {exc.user_message}", file=sys.stderr)
         if exc.detail:
             print(f"Détail : {exc.detail}", file=sys.stderr)
+        raise SystemExit(1)
+    except Exception as exc:
+        print(
+            "\nErreur : La transcription a échoué.", file=sys.stderr
+        )
+        print(f"Détail : {exc}", file=sys.stderr)
         raise SystemExit(1)
 
     print("\n✅ Transcription terminée !")

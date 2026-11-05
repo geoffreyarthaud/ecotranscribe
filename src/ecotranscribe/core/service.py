@@ -9,7 +9,6 @@ from pathlib import Path
 from .config import KEY_MISSING_MESSAGE
 from .engines.base import LogCallback, ProgressCallback, TranscriptionEngine
 from .errors import (
-    CancelledError,
     EngineUnavailableError,
     InvalidRequestError,
     OutputExistsError,

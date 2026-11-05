@@ -210,6 +210,8 @@ class WhisperEngine:
                 media.get_media_duration(request.input_path, cancel=cancel)
                 or 0.0
             )
+        except CancelledError:
+            raise
         except TranscribeError:
             total_audio_s = 0.0
 
@@ -241,6 +243,8 @@ class WhisperEngine:
                                 )
                                 or 0.0
                             )
+                        except CancelledError:
+                            raise
                         except TranscribeError:
                             total_audio_s = 0.0
 
