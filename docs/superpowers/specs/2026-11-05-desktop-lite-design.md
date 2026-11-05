@@ -107,6 +107,7 @@ Pousse un tag `v0.2.0` ; GitHub Actions construit les artefacts lite, les signe 
 | FR-08 | MUST | Avant de lancer, si un fichier de sortie existe, un dialogue liste les fichiers et demande « Écraser » ou « Annuler » ; « Annuler » ne modifie rien. |
 | FR-09 | MUST | La clé OpenRouter peut être saisie, mémorisée dans le trousseau, supprimée, ou lue depuis `OPENROUTER_API_KEY` ; elle n'apparaît jamais dans les logs. |
 | FR-10 | MUST | La transcription s'exécute dans un thread worker ; l'UI reste réactive ; les contrôles sont désactivés pendant l'exécution. |
+| FR-10.1 | MUST | Afficher une progression visible pendant toute la tâche : phase courante, barre déterminée pour la transcription (pourcentage et position audio `mm:ss / mm:ss`), barre indéterminée pour l'extraction, la détection des silences et l'écriture, temps écoulé, et ETA lorsque calculable. La progression de la transcription avance après chaque tranche ; aucune fausse barre déterminée n'est affichée sans total connu. |
 | FR-11 | MUST | Le bouton Annuler interrompt la tâche avant l'écriture finale ; aucun fichier de sortie n'est écrit ; les fichiers temporaires sont nettoyés. Pendant la phase d'écriture, Annuler est désactivé. |
 | FR-12 | MUST | Les sorties SRT/TXT respectent le format exact du CLI actuel, en UTF-8 et fins de ligne LF. |
 | FR-13 | MUST | Le coût OpenRouter est affiché après la transcription, avec 6 décimales ; « Coût indisponible » si l'API ne renvoie pas `usage.cost`. |
@@ -272,6 +273,8 @@ docs/
 | `current` | `float` | secondes audio ou tranches traitées |
 | `total` | `float \| None` | total si déterminé, sinon `None` |
 | `detail` | `str` | ex. « Tranche 2/3 », « Extraction audio » |
+
+Les mises à jour sont émises à chaque changement de phase et après chaque tranche ; l'UI peut les throttler à 10 Hz maximum. Une barre déterminée n'est affichée que si `total` est connu ; sinon la barre reste indéterminée.
 
 #### `EngineAvailability`
 
@@ -459,7 +462,7 @@ Taille minimale 760 × 640 ; géométrie mémorisée.
 | Clé API | `QLineEdit` mot de passe + « Mémoriser » + « Supprimer » | keyring/env ; jamais loggée |
 | Avertissement cloud | texte « L'audio est envoyé à OpenRouter ; le prompt l'est si le modèle le supporte. » | visible quand OpenRouter est actif |
 | Actions | « Lancer » / « Annuler » | Lancer désactivé sans fichier ; la validation complète se fait au clic ; Annuler actif hors phase d'écriture |
-| Progression | barre + libellé de phase + journal repliable | indéterminée pour extraction/silences, déterminée pour transcription |
+| Progression | barre + libellé de phase + journal repliable | indéterminée pour extraction/silences/écriture ; déterminée pour transcription avec pourcentage, position audio, temps écoulé et ETA ; avance après chaque tranche |
 | Résultat | statut, coût, « Ouvrir le dossier » | après succès |
 
 ### 9.2 États
@@ -886,7 +889,7 @@ L'édition lite envoie l'audio à OpenRouter ; le prompt est envoyé comme conte
 | `test_outputs.py` | chemins `<stem>.srt/.txt` ; dossier alternatif ; existant + `overwrite=False` → erreur ; existant + `overwrite=True` |
 | `test_prompts.py` | priorité `.prompt.md` > `.prompt.txt` > `.prompt` ; absence ; lecture UTF-8 |
 | `test_media.py` | résolution bundled > PATH ; override env ; `CREATE_NO_WINDOW` sous Windows ; décodage UTF-8 ; annulation |
-| `test_service.py` | succès avec faux moteur ; validation ; clé manquante ; provider indisponible ; annulation ; erreur moteur ; aucun fichier partiel |
+| `test_service.py` | succès avec faux moteur ; validation ; clé manquante ; provider indisponible ; annulation ; erreur moteur ; aucun fichier partiel ; séquence de `ProgressUpdate` par phase et progression après chaque tranche |
 | `test_openrouter.py` | tests existants de découpage/offsets/context_bias ; payload avec/sans langue ; prompt Mistral vs non-Mistral ; coût ; progression ; annulation entre tranches |
 
 Les tests Whisper sont ignorés si l'extra `[whisper]` n'est pas installé.
@@ -900,6 +903,7 @@ Avec `pytest-qt` et un `DialogService` factice :
 - Lancer est désactivé sans fichier ;
 - la sélection d'un fichier met à jour le dossier de sortie et le prompt détecté ;
 - les signaux `progress`, `finished`, `failed`, `cancelled` mettent à jour l'UI ;
+- un `ProgressUpdate` déterminé met à jour la barre, le pourcentage, la position audio et l'ETA ; un `total=None` passe la barre en mode indéterminé ;
 - Annuler appelle le `CancelToken` ;
 - le dialogue d'écrasement est appelé avant le lancement ;
 - les réglages sont persistés et rechargés ;
@@ -941,6 +945,7 @@ Avec `pytest-qt` et un `DialogService` factice :
 - [ ] L'AppImage Linux se lance après `chmod +x`, sans root.
 - [ ] Whisper est désactivé avec la raison attendue.
 - [ ] OpenRouter transcrit `data/sample.mp4` et produit les sorties attendues.
+- [ ] La progression affiche la phase, le pourcentage, la position audio, le temps écoulé et l'ETA pendant la transcription, et reste indéterminée pour les phases sans total.
 - [ ] L'annulation ne laisse aucun fichier de sortie ni fichier temporaire.
 - [ ] Le dialogue d'écrasement fonctionne et « Annuler » ne modifie rien.
 - [ ] La clé est dans le keyring, jamais dans les logs/`QSettings`.
