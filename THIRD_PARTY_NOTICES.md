@@ -5,8 +5,9 @@ suivants sont embarqués dans les artefacts binaires.
 
 ## PySide6 / Qt
 
-- Composant : PySide6-Essentials, Qt 6.
+- Composant : PySide6-Essentials 6.9.3, Qt 6.9.
 - Licence : LGPLv3 (PySide6), LGPLv3/GPLv3 (Qt selon les modules).
+- Version épinglée `< 6.10` pour conserver macOS 12+ et `macos-13`.
 - Texte : <https://www.gnu.org/licenses/lgpl-3.0.html>.
 - Le build PyInstaller `--onedir` conserve les bibliothèques Qt sous forme de
   fichiers remplaçables dans `_internal/PySide6/Qt/lib` (ou l'équivalent
