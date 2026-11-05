@@ -74,6 +74,12 @@ def test_build_options_omits_auto_language() -> None:
     assert options["fp16"] is True
 
 
+def test_progress_shim_is_a_context_manager() -> None:
+    progress = _WhisperProgress(total=2000, total_audio_s=20.0)
+    with progress as entered:
+        assert entered is progress
+
+
 def test_progress_shim_reports_audio_seconds() -> None:
     updates: list[ProgressUpdate] = []
     progress = _WhisperProgress(

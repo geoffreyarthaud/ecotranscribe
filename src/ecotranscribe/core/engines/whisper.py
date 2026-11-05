@@ -119,6 +119,12 @@ class _WhisperProgress:
             )
         )
 
+    def __enter__(self) -> "_WhisperProgress":
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        self.close()
+
     def update(self, n: int = 1) -> None:
         if self._cancel is not None:
             self._cancel.raise_if_cancelled()
