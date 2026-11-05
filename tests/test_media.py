@@ -9,6 +9,10 @@ from ecotranscribe.core import media
 from ecotranscribe.core.errors import CancelledError, MediaToolMissingError, TranscribeError
 from ecotranscribe.core.models import CancelToken
 
+posix_only = pytest.mark.skipif(
+    sys.platform == "win32", reason="outils factices POSIX"
+)
+
 
 def _write_tool(path: Path, body: str) -> Path:
     path.write_text("#!/bin/sh\n" + body, encoding="utf-8")
@@ -16,6 +20,7 @@ def _write_tool(path: Path, body: str) -> Path:
     return path
 
 
+@posix_only
 def test_env_override_wins(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     tool = _write_tool(tmp_path / "ffmpeg", "exit 0\n")
     monkeypatch.setenv("ECOTRANSCRIBE_FFMPEG_DIR", str(tmp_path))
@@ -23,6 +28,7 @@ def test_env_override_wins(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
     assert media.resolve_tool("ffmpeg") == str(tool)
 
 
+@posix_only
 def test_bundle_wins_over_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     bundle = tmp_path / "bundle" / "bin"
     bundle.mkdir(parents=True)
@@ -37,7 +43,8 @@ def test_path_is_last_resort(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.delenv("ECOTRANSCRIBE_FFMPEG_DIR", raising=False)
     monkeypatch.delattr(media.sys, "_MEIPASS", raising=False)
     monkeypatch.setattr(media.shutil, "which", lambda name: "/usr/bin/" + name)
-    assert media.resolve_tool("ffmpeg") == "/usr/bin/ffmpeg"
+    expected = "/usr/bin/ffmpeg.exe" if sys.platform == "win32" else "/usr/bin/ffmpeg"
+    assert media.resolve_tool("ffmpeg") == expected
 
 
 def test_missing_tool_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -50,7 +57,13 @@ def test_missing_tool_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
 
 def test_run_media_decodes_utf8() -> None:
     result = media.run_media(
-        [sys.executable, "-c", "print('accentué — ok')"], timeout=10
+        [
+            sys.executable,
+            "-c",
+            "import sys; sys.stdout.buffer.write("
+            "'accentué — ok'.encode('utf-8'))",
+        ],
+        timeout=10,
     )
     assert result.returncode == 0
     assert "accentué" in result.stdout
@@ -84,6 +97,7 @@ def test_windows_creation_flags(monkeypatch: pytest.MonkeyPatch) -> None:
     assert media.creation_flags() == media.CREATE_NO_WINDOW
 
 
+@posix_only
 def test_get_media_duration_parses_json(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -96,6 +110,7 @@ def test_get_media_duration_parses_json(
     assert tool.exists()
 
 
+@posix_only
 def test_detect_silences_parses_stderr(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -108,6 +123,7 @@ def test_detect_silences_parses_stderr(
     assert media.detect_silences(tmp_path / "x.wav") == [(1.5, 2.5)]
 
 
+@posix_only
 def test_extract_audio_failure_reports_stderr(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -118,6 +134,7 @@ def test_extract_audio_failure_reports_stderr(
     assert "boom" in (error.value.detail or "")
 
 
+@posix_only
 def test_tool_version_reads_first_line(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

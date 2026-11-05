@@ -188,7 +188,7 @@ class FakeService:
         block: bool = False,
     ) -> None:
         self.result = result or TranscribeResult(
-            output_paths=(Path("/tmp/out.srt"),),
+            output_paths=(Path("out.srt"),),
             text="Bonjour",
             segments=(Segment(1, 0.0, 1.0, "Bonjour"),),
             language="fr",

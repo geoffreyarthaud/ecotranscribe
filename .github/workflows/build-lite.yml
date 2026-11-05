@@ -20,9 +20,19 @@ jobs:
           - os: macos-14
             target: darwin-arm64
             arch: arm64
+            platform: macos
           - os: macos-13
             target: darwin-x64
             arch: x64
+            platform: macos
+          - os: windows-latest
+            target: win-x64
+            arch: x64
+            platform: windows
+          - os: ubuntu-22.04
+            target: linux-x64
+            arch: x64
+            platform: linux
     env:
       QT_QPA_PLATFORM: offscreen
       ECOTRANSCRIBE_TARGET: ${{ matrix.target }}
@@ -44,6 +54,18 @@ jobs:
       - name: Run tests
         run: uv run pytest -q
 
+      - name: Install Linux runtime dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfuse2
+
+      - name: Install Inno Setup (optional)
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
       - name: Cache ffmpeg
         uses: actions/cache@v4
         with:
@@ -57,6 +79,7 @@ jobs:
         run: uv run python packaging/make_icons.py
 
       - name: Build metadata
+        shell: bash
         run: |
           echo "ECOTRANSCRIBE_COMMIT=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
           echo "ECOTRANSCRIBE_BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
@@ -64,52 +87,101 @@ jobs:
       - name: Build app
         run: uv run pyinstaller --noconfirm packaging/pyinstaller.spec
 
-      - name: Sign ad-hoc
+      - name: Sign macOS ad-hoc
+        if: runner.os == 'macOS'
+        shell: bash
         run: bash packaging/sign_macos.sh "dist/EcoTranscribe Desktop.app"
 
-      - name: Build DMG and ZIP
+      - name: Build macOS DMG and ZIP
+        if: runner.os == 'macOS'
+        shell: bash
         run: |
           VERSION="$(uv run python -c 'import ecotranscribe; print(ecotranscribe.__version__)')"
           bash packaging/make_dmg.sh "$VERSION" "${{ matrix.arch }}" \
             "$ECOTRANSCRIBE_COMMIT" "$ECOTRANSCRIBE_BUILD_DATE" "v$VERSION"
 
-      - name: Diagnose frozen app
+      - name: Build Windows ZIP and optional installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $Version = uv run python -c "import ecotranscribe; print(ecotranscribe.__version__)"
+          & "$PWD/packaging/make_windows.ps1" `
+            -Version $Version -Arch "${{ matrix.arch }}" `
+            -Commit "$env:ECOTRANSCRIBE_COMMIT" `
+            -BuildDate "$env:ECOTRANSCRIBE_BUILD_DATE"
+
+      - name: Build Linux AppImage and tar.gz
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          VERSION="$(uv run python -c 'import ecotranscribe; print(ecotranscribe.__version__)')"
+          bash packaging/make_appimage.sh "$VERSION" "${{ matrix.arch }}" \
+            "$ECOTRANSCRIBE_COMMIT" "$ECOTRANSCRIBE_BUILD_DATE" "v$VERSION"
+
+      - name: Diagnose macOS artifact
+        if: runner.os == 'macOS'
+        shell: bash
         run: |
           "dist/EcoTranscribe Desktop.app/Contents/MacOS/EcoTranscribe Desktop" \
             --diagnose --diagnose-output "$RUNNER_TEMP/diag.json"
-          uv run python - <<'PY'
-          import json, os
-          from pathlib import Path
-          data = json.loads(Path(os.environ["RUNNER_TEMP"], "diag.json").read_text())
-          assert data["flavor"] == "lite"
-          assert data["frozen"] is True
-          assert data["whisper_available"] is False
-          assert data["ffmpeg_path"] and "EcoTranscribe Desktop.app" in data["ffmpeg_path"]
-          assert data["ffprobe_path"] and "EcoTranscribe Desktop.app" in data["ffprobe_path"]
-          assert data["ffmpeg_version"] and data["ffprobe_version"]
-          print(data["ffmpeg_version"])
-          PY
+          uv run python packaging/check_diagnostic.py "$RUNNER_TEMP/diag.json"
 
-      - name: Verify bundle contents and size
+      - name: Diagnose Windows ZIP
+        if: runner.os == 'Windows'
+        shell: pwsh
         run: |
-          APP="dist/EcoTranscribe Desktop.app"
-          if find "$APP" \( -iname '*torch*' -o -iname '*whisper*' \) -print -quit | grep -q .; then
-            echo "torch/whisper détecté dans l'artefact lite" >&2
-            exit 1
-          fi
+          $zip = Get-ChildItem "dist/*windows-*.zip" | Select-Object -First 1
+          $tmp = Join-Path $env:RUNNER_TEMP "zipcheck"
+          Expand-Archive -Path $zip.FullName -DestinationPath $tmp -Force
+          $exe = Join-Path $tmp "EcoTranscribe Desktop\EcoTranscribe Desktop.exe"
+          $out = Join-Path $env:RUNNER_TEMP "diag.json"
+          $process = Start-Process -FilePath $exe `
+            -ArgumentList "--diagnose", "--diagnose-output", $out `
+            -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "Le diagnostic de l'exe Windows a échoué"
+          }
+          uv run python packaging/check_diagnostic.py $out
+
+      - name: Diagnose Linux artifacts
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          APPIMAGE="$(ls dist/*.AppImage | head -1)"
+          QT_QPA_PLATFORM=offscreen "$APPIMAGE" --appimage-extract-and-run \
+            --diagnose --diagnose-output "$RUNNER_TEMP/diag-appimage.json"
+          uv run python packaging/check_diagnostic.py "$RUNNER_TEMP/diag-appimage.json"
+
+          mkdir -p "$RUNNER_TEMP/tarcheck"
+          tar -xzf "$(ls dist/*.tar.gz | head -1)" -C "$RUNNER_TEMP/tarcheck"
+          QT_QPA_PLATFORM=offscreen \
+            "$RUNNER_TEMP/tarcheck/EcoTranscribe Desktop/EcoTranscribe Desktop" \
+            --diagnose --diagnose-output "$RUNNER_TEMP/diag-tar.json"
+          uv run python packaging/check_diagnostic.py "$RUNNER_TEMP/diag-tar.json"
+
+      - name: Verify lite contents and size
+        shell: bash
+        run: |
           uv run python - <<'PY'
+          import sys
           from pathlib import Path
-          import shutil
-          app = Path("dist/EcoTranscribe Desktop.app")
+          app = Path("dist/EcoTranscribe Desktop")
+          if sys.platform == "darwin":
+              app = Path("dist/EcoTranscribe Desktop.app")
+          bad = [
+              path for path in app.rglob("*")
+              if path.name.lower().startswith(("torch", "whisper", "libtorch"))
+          ]
+          assert not bad, f"torch/whisper détecté : {bad[:5]}"
           size_mb = sum(p.stat().st_size for p in app.rglob("*") if p.is_file()) / 1_000_000
           assert size_mb <= 450, f"app trop grande : {size_mb:.1f} Mo"
-          for pattern in ("*.dmg", "*.zip"):
-              for artifact in Path("dist").glob(pattern):
-                  assert artifact.stat().st_size <= 300_000_000, artifact
-          print(f"app {size_mb:.1f} Mo")
+          for artifact in Path("dist").glob("ecotranscribe-desktop-lite-*"):
+              assert artifact.stat().st_size <= 300_000_000, artifact
+          print(f"app {size_mb:.1f} Mo, artefacts OK")
           PY
 
       - name: Upload macOS artifacts
+        if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
           name: ecotranscribe-lite-${{ matrix.target }}
@@ -118,3 +190,25 @@ jobs:
             dist/ecotranscribe-desktop-lite-macos-${{ matrix.arch }}-*.dmg
             dist/ecotranscribe-desktop-lite-macos-${{ matrix.arch }}-*.zip
             dist/SHA256SUMS-macos-${{ matrix.arch }}.txt
+
+      - name: Upload Windows artifacts
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecotranscribe-lite-${{ matrix.target }}
+          if-no-files-found: error
+          path: |
+            dist/ecotranscribe-desktop-lite-windows-${{ matrix.arch }}-*.zip
+            dist/ecotranscribe-desktop-lite-windows-${{ matrix.arch }}-*-setup.exe
+            dist/SHA256SUMS-windows-${{ matrix.arch }}.txt
+
+      - name: Upload Linux artifacts
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecotranscribe-lite-${{ matrix.target }}
+          if-no-files-found: error
+          path: |
+            dist/ecotranscribe-desktop-lite-linux-${{ matrix.arch }}-*.AppImage
+            dist/ecotranscribe-desktop-lite-linux-${{ matrix.arch }}-*.tar.gz
+            dist/SHA256SUMS-linux-${{ matrix.arch }}.txt
