@@ -1,0 +1,120 @@
+name: build-lite
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: darwin-arm64
+            arch: arm64
+          - os: macos-13
+            target: darwin-x64
+            arch: x64
+    env:
+      QT_QPA_PLATFORM: offscreen
+      ECOTRANSCRIBE_TARGET: ${{ matrix.target }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install Python
+        run: uv python install 3.13
+
+      - name: Install lite and test dependencies
+        run: uv sync --extra gui --extra dev
+
+      - name: Run tests
+        run: uv run pytest -q
+
+      - name: Cache ffmpeg
+        uses: actions/cache@v4
+        with:
+          path: vendor/ffmpeg
+          key: ffmpeg-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('packaging/ffmpeg.lock.json') }}
+
+      - name: Fetch ffmpeg
+        run: uv run python packaging/fetch_ffmpeg.py --target "$ECOTRANSCRIBE_TARGET"
+
+      - name: Generate icons
+        run: uv run python packaging/make_icons.py
+
+      - name: Build metadata
+        run: |
+          echo "ECOTRANSCRIBE_COMMIT=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+          echo "ECOTRANSCRIBE_BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
+      - name: Build app
+        run: uv run pyinstaller --noconfirm packaging/pyinstaller.spec
+
+      - name: Sign ad-hoc
+        run: bash packaging/sign_macos.sh "dist/EcoTranscribe Desktop.app"
+
+      - name: Build DMG and ZIP
+        run: |
+          VERSION="$(uv run python -c 'import ecotranscribe; print(ecotranscribe.__version__)')"
+          bash packaging/make_dmg.sh "$VERSION" "${{ matrix.arch }}" \
+            "$ECOTRANSCRIBE_COMMIT" "$ECOTRANSCRIBE_BUILD_DATE" "v$VERSION"
+
+      - name: Diagnose frozen app
+        run: |
+          "dist/EcoTranscribe Desktop.app/Contents/MacOS/EcoTranscribe Desktop" \
+            --diagnose --diagnose-output "$RUNNER_TEMP/diag.json"
+          uv run python - <<'PY'
+          import json, os
+          from pathlib import Path
+          data = json.loads(Path(os.environ["RUNNER_TEMP"], "diag.json").read_text())
+          assert data["flavor"] == "lite"
+          assert data["frozen"] is True
+          assert data["whisper_available"] is False
+          assert data["ffmpeg_path"] and "EcoTranscribe Desktop.app" in data["ffmpeg_path"]
+          assert data["ffprobe_path"] and "EcoTranscribe Desktop.app" in data["ffprobe_path"]
+          assert data["ffmpeg_version"] and data["ffprobe_version"]
+          print(data["ffmpeg_version"])
+          PY
+
+      - name: Verify bundle contents and size
+        run: |
+          APP="dist/EcoTranscribe Desktop.app"
+          if find "$APP" \( -iname '*torch*' -o -iname '*whisper*' \) -print -quit | grep -q .; then
+            echo "torch/whisper détecté dans l'artefact lite" >&2
+            exit 1
+          fi
+          uv run python - <<'PY'
+          from pathlib import Path
+          import shutil
+          app = Path("dist/EcoTranscribe Desktop.app")
+          size_mb = sum(p.stat().st_size for p in app.rglob("*") if p.is_file()) / 1_000_000
+          assert size_mb <= 450, f"app trop grande : {size_mb:.1f} Mo"
+          for pattern in ("*.dmg", "*.zip"):
+              for artifact in Path("dist").glob(pattern):
+                  assert artifact.stat().st_size <= 300_000_000, artifact
+          print(f"app {size_mb:.1f} Mo")
+          PY
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecotranscribe-lite-${{ matrix.target }}
+          if-no-files-found: error
+          path: |
+            dist/ecotranscribe-desktop-lite-macos-${{ matrix.arch }}-*.dmg
+            dist/ecotranscribe-desktop-lite-macos-${{ matrix.arch }}-*.zip
+            dist/SHA256SUMS-macos-${{ matrix.arch }}.txt

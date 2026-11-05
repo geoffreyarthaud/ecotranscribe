@@ -1,0 +1,14 @@
+EcoTranscribe Desktop — édition lite
+Version {version} — build {build_date}
+Source : {project_url}
+
+INSTALLATION
+1. Rendre l'AppImage exécutable :
+   chmod +x ecotranscribe-desktop-lite-linux-x64-{version}.AppImage
+2. Lancer :
+   ./ecotranscribe-desktop-lite-linux-x64-{version}.AppImage
+3. Si FUSE n'est pas disponible :
+   ./ecotranscribe-desktop-lite-linux-x64-{version}.AppImage --appimage-extract-and-run
+4. Vérifier l'intégrité :
+   sha256sum ecotranscribe-desktop-lite-linux-x64-{version}.AppImage
+   comparer avec SHA256SUMS.txt, fourni avec la release.

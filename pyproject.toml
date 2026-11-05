@@ -9,7 +9,7 @@ dependencies = ["rich>=15.0.0"]
 
 [project.optional-dependencies]
 gui = [
-    "PySide6-Essentials>=6.7,<7",
+    "PySide6-Essentials>=6.7,<6.10",
     "keyring>=25",
 ]
 whisper = ["openai-whisper>=20231117"]
