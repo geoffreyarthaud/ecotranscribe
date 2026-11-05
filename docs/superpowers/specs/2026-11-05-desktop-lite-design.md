@@ -1,7 +1,7 @@
 # Spécification — EcoTranscribe Desktop, édition lite
 
 - **Date** : 2026-11-05
-- **Statut** : proposée, en attente de revue
+- **Statut** : approuvée pour implémentation (2026-11-05)
 - **Version cible** : 0.2.0
 - **Périmètre** : application desktop lite multiplateforme et CLI `ecotranscribe` conservé, distribution macOS `.app` ad-hoc
 - **Hors périmètre** : Whisper local dans le lite, build full, notarisation, App Store
