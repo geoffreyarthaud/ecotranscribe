@@ -135,6 +135,7 @@ class MainWindow(QMainWindow):
     def _build_ui(self) -> None:
         self.setWindowTitle("EcoTranscribe Desktop")
         self.setMinimumSize(760, 640)
+        self.resize(900, 820)
         self.setAcceptDrops(True)
 
         scroll = QScrollArea()
