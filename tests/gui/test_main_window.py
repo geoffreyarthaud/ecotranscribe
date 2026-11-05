@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from PySide6.QtCore import QSettings
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import QLineEdit
+from PySide6.QtWidgets import QFormLayout, QLineEdit
 
 from ecotranscribe.core.config import OPENROUTER_MODEL
 from ecotranscribe.core.errors import CancelledError, TranscribeError
@@ -60,6 +60,17 @@ def test_window_construction_without_network(
     assert window.acceptDrops() is True
     assert window.api_key_edit.echoMode() == QLineEdit.EchoMode.Password
     assert window.api_key_edit.placeholderText() == "OPENROUTER_API_KEY"
+
+
+def test_form_fields_grow_to_window_width(
+    qtbot, app_settings: AppSettings
+) -> None:
+    window = _window(app_settings)
+    qtbot.addWidget(window)
+    assert (
+        window.form_layout.fieldGrowthPolicy()
+        == QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
+    )
 
 
 def test_shortcuts_are_registered(

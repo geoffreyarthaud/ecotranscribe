@@ -218,6 +218,10 @@ class MainWindow(QMainWindow):
         # Réglages
         form = QFormLayout()
         form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        form.setFieldGrowthPolicy(
+            QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
+        )
+        self.form_layout = form
 
         self.model_combo = QComboBox()
         self.model_combo.setEditable(True)
