@@ -1,21 +1,39 @@
-# Spécification — Whisper Transcribe Desktop, édition lite
+# Spécification — EcoTranscribe Desktop, édition lite
 
 - **Date** : 2026-11-05
 - **Statut** : proposée, en attente de revue
 - **Version cible** : 0.2.0
-- **Périmètre** : application desktop lite multiplateforme, distribution macOS `.app` ad-hoc
+- **Périmètre** : application desktop lite multiplateforme et CLI `ecotranscribe` conservé, distribution macOS `.app` ad-hoc
 - **Hors périmètre** : Whisper local dans le lite, build full, notarisation, App Store
 
 ## 1. Contexte
 
-Le projet est aujourd'hui un CLI Python lancé avec `uv` :
+Le projet, actuellement `whisper-transcribe`, est renommé **EcoTranscribe** dans cette version. Le paquet Python devient `ecotranscribe`, le CLI `ecotranscribe` et l'application desktop **EcoTranscribe Desktop** (entrée `ecotranscribe-desktop`). Aucun alias `transcribe`/`whisper_transcribe` n'est conservé : le renommage est complet.
+
+Le CLI est lancé avec `uv` :
 
 ```bash
-uv run transcribe <fichier>
-uv run transcribe --provider openrouter <fichier>
+uv run ecotranscribe <fichier>
+uv run ecotranscribe --provider openrouter <fichier>
 ```
 
 Il expose trois arguments (`input`, `--provider`, `--model`) et s'appuie sur deux moteurs : Whisper local et OpenRouter. Il écrit `<racine>.srt` et `<racine>.txt` à côté du fichier source, affiche une progression `rich`, demande confirmation avant écrasement et lit `OPENROUTER_API_KEY` dans l'environnement.
+
+### 1.1 Nommage
+
+| Élément | Nom |
+|---|---|
+| Produit | EcoTranscribe |
+| Paquet Python | `ecotranscribe` |
+| CLI | `ecotranscribe` |
+| Application desktop | `EcoTranscribe Desktop` |
+| Entrée desktop | `ecotranscribe-desktop` |
+| Bundle macOS | `app.ecotranscribe.desktop` |
+| Keyring / organisation QSettings | `ecotranscribe` |
+| Variables d'environnement | `ECOTRANSCRIBE_*` (hors `OPENROUTER_API_KEY`, imposé par OpenRouter) |
+| Artefacts | `ecotranscribe-desktop-lite-*` |
+
+Le moteur local reste `whisper` / `openai-whisper` ; c'est un moteur, pas le nom du produit. Aucun alias `transcribe` ou `whisper_transcribe` n'est conservé.
 
 L'objectif est de fournir une application de bureau aux collègues qui n'ont ni Python, ni `uv`, ni `ffmpeg` installés, tout en gardant le CLI pour les développeurs. L'édition **lite** ne contient que le moteur OpenRouter afin de rester petite et de ne pas embarquer torch/Whisper. Sur macOS, elle est distribuée sans compte Apple Developer : signature ad-hoc, DMG, notice d'ouverture et SHA256.
 
@@ -68,7 +86,7 @@ L'objectif est de fournir une application de bureau aux collègues qui n'ont ni 
 
 ### 5.1 Collègue non technique
 
-1. Télécharge `whisper-transcribe-lite-macos-arm64-0.2.0.dmg`.
+1. Télécharge `ecotranscribe-desktop-lite-macos-arm64-0.2.0.dmg`.
 2. Vérifie le SHA256, ouvre le DMG, glisse l'app dans `/Applications`.
 3. Au premier lancement, macOS bloque l'app ; il suit la notice : Réglages Système → Confidentialité et sécurité → « Ouvrir quand même », ou `xattr -dr com.apple.quarantine`.
 4. Lance l'app, saisit sa clé OpenRouter, choisit un fichier.
@@ -78,15 +96,15 @@ L'objectif est de fournir une application de bureau aux collègues qui n'ont ni 
 
 ```bash
 uv sync --extra gui
-uv run transcribe-gui
+uv run ecotranscribe-desktop
 ```
 
 ### 5.3 Utilisateur du CLI
 
 ```bash
 uv sync --extra whisper
-uv run transcribe --provider openrouter fichier.mp4
-uv run transcribe fichier.mp4          # Whisper, si l'extra est installé
+uv run ecotranscribe --provider openrouter fichier.mp4
+uv run ecotranscribe fichier.mp4          # Whisper, si l'extra est installé
 ```
 
 ### 5.4 Mainteneur
@@ -115,8 +133,8 @@ Pousse un tag `v0.2.0` ; GitHub Actions construit les artefacts lite, les signe 
 | FR-15 | MUST | Les erreurs affichent un message utilisateur actionnable, des détails techniques et un accès au journal. |
 | FR-16 | MUST | Les réglages non secrets sont persistés entre les lancements. |
 | FR-17 | MUST | Un journal est écrit dans le dossier de données de l'application et affiché dans un panneau repliable. |
-| FR-18 | MUST | `transcribe-gui --diagnose` produit un JSON de diagnostic et quitte sans afficher de fenêtre. |
-| FR-19 | MUST | Le CLI `transcribe` conserve ses arguments et son comportement, à l'exception de l'extra `[whisper]` désormais requis pour le moteur local. |
+| FR-18 | MUST | `ecotranscribe-desktop --diagnose` produit un JSON de diagnostic et quitte sans afficher de fenêtre. |
+| FR-19 | MUST | Le CLI `ecotranscribe` conserve ses arguments et son comportement, à l'exception de l'extra `[whisper]` désormais requis pour le moteur local. |
 | FR-20 | MUST | L'application n'émet aucune requête réseau hors OpenRouter ; pas de télémétrie, pas de vérification de mise à jour. |
 | FR-21 | MUST | L'artefact lite ne contient ni `torch`, ni `whisper`, ni modèle local. |
 | FR-22 | MUST | Sur macOS, le `.app` est signé ad-hoc, vérifiable avec `codesign --verify`, et accompagné d'une notice d'ouverture. |
@@ -181,7 +199,7 @@ Le cœur ne connaît ni Qt ni `argparse`. Il ne fait aucun `print`, ne demande a
 ### 8.2 Arborescence cible
 
 ```text
-src/whisper_transcribe/
+src/ecotranscribe/
 ├── __init__.py
 ├── core/
 │   ├── __init__.py
@@ -382,7 +400,7 @@ Ajouts requis :
 
 `resolve_tool(name)` cherche dans cet ordre :
 
-1. `WHISPER_TRANSCRIBE_FFMPEG_DIR` (override de développement/test).
+1. `ECOTRANSCRIBE_FFMPEG_DIR` (override de développement/test).
 2. Dossier `bin/` du bundle : `sys._MEIPASS/bin`, ou `Contents/Resources/bin` pour le `.app` macOS.
 3. `shutil.which(name)`.
 4. Réglage utilisateur (chemin explicite), si ajouté plus tard.
@@ -431,11 +449,11 @@ Le CLI :
 - affiche les erreurs sur `stderr` et sort avec le code 1 ;
 - utilise le même service et les mêmes writers que la GUI.
 
-Whisper est déplacé dans l'extra `[whisper]`. Sans cet extra, `transcribe --provider whisper` affiche : « Moteur Whisper non installé. Lancez `uv sync --extra whisper`. » Le provider par défaut reste `whisper` ; le README documente l'extra.
+Whisper est déplacé dans l'extra `[whisper]`. Sans cet extra, `ecotranscribe --provider whisper` affiche : « Moteur Whisper non installé. Lancez `uv sync --extra whisper`. » Le provider par défaut reste `whisper` ; le README documente l'extra.
 
 ### 8.9 GUI
 
-- `QApplication` avec `setApplicationName("Whisper Transcribe")`, `setOrganizationName("whisper-transcribe")`.
+- `QApplication` avec `setApplicationName("EcoTranscribe Desktop")`, `setOrganizationName("ecotranscribe")`.
 - Fenêtre principale `QMainWindow`.
 - Worker `QObject` déplacé dans un `QThread`.
 - Signaux : `progress(object)`, `log(str)`, `finished(object)`, `failed(str, str)`, `cancelled()`.
@@ -452,7 +470,7 @@ Taille minimale 760 × 640 ; géométrie mémorisée.
 
 | Zone | Contrôles | Comportement |
 |---|---|---|
-| En-tête | titre « Whisper Transcribe », badge « Édition lite — OpenRouter » | fixe |
+| En-tête | titre « EcoTranscribe Desktop », badge « Édition lite — OpenRouter » | fixe |
 | Source | `QLineEdit` + « Parcourir… » + zone de drop | filtre audio/vidéo + tous fichiers ; valide un fichier régulier |
 | Fournisseur | radio « OpenRouter (cloud) » cochée, radio « Whisper local » désactivée | Whisper affiche la raison et un lien « Édition full » |
 | Modèle | `QComboBox` éditable | défaut voxtral-mini ; conserve les 5 derniers modèles |
@@ -495,7 +513,7 @@ Les erreurs de validation s'affichent en ligne sous le champ concerné, pas dans
 
 ### 9.4 Gestion de la clé API
 
-- Service keyring : `whisper-transcribe`, utilisateur `openrouter`.
+- Service keyring : `ecotranscribe`, utilisateur `openrouter`.
 - Au démarrage : charger la clé dans le champ masqué si elle existe ; sinon laisser vide avec placeholder `OPENROUTER_API_KEY`.
 - « Mémoriser » coché par défaut : enregistre dans le keyring au lancement.
 - « Supprimer » efface le keyring et vide le champ.
@@ -530,7 +548,7 @@ Les erreurs de validation s'affichent en ligne sous le champ concerné, pas dans
 
 ### 9.7 Diagnostic
 
-`transcribe-gui --diagnose [--diagnose-output PATH]` :
+`ecotranscribe-desktop --diagnose [--diagnose-output PATH]` :
 
 - N'affiche aucune fenêtre.
 - Écrit un JSON UTF-8 sur stdout et, si demandé, dans `PATH`, même si un outil manque.
@@ -580,6 +598,8 @@ Champs :
 
 ```toml
 [project]
+name = "ecotranscribe"
+version = "0.2.0"
 dependencies = ["rich>=15.0.0"]
 
 [project.optional-dependencies]
@@ -601,21 +621,21 @@ Entry points :
 
 ```toml
 [project.scripts]
-transcribe = "whisper_transcribe.cli:main"
-transcribe-gui = "whisper_transcribe.gui.app:main"
+ecotranscribe = "ecotranscribe.cli:main"
+ecotranscribe-desktop = "ecotranscribe.gui.app:main"
 ```
 
 ### 10.2 PyInstaller
 
 - Mode `--onedir`, jamais `--onefile`.
 - `console=False` / `--windowed`.
-- Entrée : `src/whisper_transcribe/gui/app.py`.
-- Nom : `Whisper Transcribe`.
-- Identifiant macOS : `io.github.whisper-transcribe`.
+- Entrée : `src/ecotranscribe/gui/app.py`.
+- Nom : `EcoTranscribe Desktop`.
+- Identifiant macOS : `app.ecotranscribe.desktop`.
 - Icône : `packaging/icon.svg` → `.icns`, `.ico`, `.png` générés au build.
 - `info_plist` : `LSMinimumSystemVersion=12.0`, `NSHighResolutionCapable=true`, version courte et build, catégorie productivité.
 - Exclusions lite : `whisper`, `torch`, `torchaudio`, `torchvision`, `numba`, `tiktoken`, `triton`, `tensorboard`, `pytest`, `tkinter`.
-- Vérifier après build qu'aucun `_internal/torch`, `_internal/whisper`, `libtorch*`, `torch*.dylib` ou `torch*.so` n'est présent (le nom de l'application « Whisper Transcribe » n'est pas concerné).
+- Vérifier après build qu'aucun `_internal/torch`, `_internal/whisper`, `libtorch*`, `torch*.dylib` ou `torch*.so` n'est présent (le nom de l'application « EcoTranscribe Desktop » n'est pas concerné).
 - Inclure `ffmpeg` et `ffprobe` dans `bin/` du bundle, exécutables.
 - Inclure `LICENSE`, `THIRD_PARTY_NOTICES.md`, `README.md`.
 
@@ -630,14 +650,14 @@ transcribe-gui = "whisper_transcribe.gui.app:main"
 
 ### 10.4 macOS : signature ad-hoc et DMG
 
-Le build produit `dist/Whisper Transcribe.app`. La signature est effectuée après PyInstaller :
+Le build produit `dist/EcoTranscribe Desktop.app`. La signature est effectuée après PyInstaller :
 
 1. Signer tous les fichiers Mach-O imbriqués (`.dylib`, `.so`, `ffmpeg`, `ffprobe`, exécutable Python) avec `codesign --force --sign -`.
 2. Signer le `.app` en dernier avec `codesign --force --sign -`.
 3. Vérifier avec `codesign --verify --deep --strict --verbose=2`.
 4. Exécuter `spctl --assess --type execute --verbose=4` et **ne pas** faire échouer le build : le rejet est attendu sans notarisation.
 5. Créer un dossier de staging avec :
-   - `Whisper Transcribe.app` ;
+   - `EcoTranscribe Desktop.app` ;
    - un lien symbolique `Applications` → `/Applications` ;
    - `LIRE-MOI-macOS.txt` ;
    - `LICENSE` ;
@@ -656,12 +676,12 @@ Contraintes :
 
 ### 10.5 Windows : ZIP portable
 
-**Mode simple principal** : le ZIP portable. L'utilisateur extrait l'archive où il veut et lance `Whisper Transcribe.exe`. Aucune installation, aucun droit administrateur, aucun runtime à installer.
+**Mode simple principal** : le ZIP portable. L'utilisateur extrait l'archive où il veut et lance `EcoTranscribe Desktop.exe`. Aucune installation, aucun droit administrateur, aucun runtime à installer.
 
 - PyInstaller onedir, pas de `--onefile`.
-- ZIP portable `whisper-transcribe-lite-windows-x64-0.2.0.zip`.
-- L'archive contient le dossier complet `Whisper Transcribe/` avec l'exécutable, `_internal/`, `bin/ffmpeg.exe`, `bin/ffprobe.exe`, la notice et les licences.
-- Installeur Inno Setup `whisper-transcribe-lite-windows-x64-0.2.0-setup.exe` : optionnel, pour un raccourci menu Démarrer et une désinstallation propre. Il n'est pas le mode principal.
+- ZIP portable `ecotranscribe-desktop-lite-windows-x64-0.2.0.zip`.
+- L'archive contient le dossier complet `EcoTranscribe Desktop/` avec l'exécutable, `_internal/`, `bin/ffmpeg.exe`, `bin/ffprobe.exe`, la notice et les licences.
+- Installeur Inno Setup `ecotranscribe-desktop-lite-windows-x64-0.2.0-setup.exe` : optionnel, pour un raccourci menu Démarrer et une désinstallation propre. Il n'est pas le mode principal.
 - `LIRE-MOI-Windows.txt` avec la procédure SmartScreen et le SHA256.
 - `CREATE_NO_WINDOW` pour tous les sous-processus.
 - Tester sur Windows 10 21H2+ et Windows 11 x64.
@@ -672,8 +692,8 @@ Contraintes :
 **Mode simple principal** : l'AppImage. Un seul fichier, `chmod +x`, double-clic ou lancement direct. Aucune installation, aucun root, aucun paquet système.
 
 - PyInstaller onedir.
-- AppImage `whisper-transcribe-lite-linux-x64-0.2.0.AppImage`.
-- Archive `whisper-transcribe-lite-linux-x64-0.2.0.tar.gz` : fallback si FUSE est absent ou si le système refuse l'AppImage.
+- AppImage `ecotranscribe-desktop-lite-linux-x64-0.2.0.AppImage`.
+- Archive `ecotranscribe-desktop-lite-linux-x64-0.2.0.tar.gz` : fallback si FUSE est absent ou si le système refuse l'AppImage.
 - `LIRE-MOI-Linux.txt` avec `chmod +x`, lancement, note FUSE et SHA256.
 - Construire sur Ubuntu 22.04 pour maximiser la compatibilité glibc.
 - Tester sur Ubuntu 22.04 et 24.04, X11 et Wayland.
@@ -712,14 +732,14 @@ Workflow `.github/workflows/build-lite.yml` :
 Nommage :
 
 ```text
-whisper-transcribe-lite-macos-arm64-0.2.0.dmg
-whisper-transcribe-lite-macos-arm64-0.2.0.zip
-whisper-transcribe-lite-macos-x64-0.2.0.dmg
-whisper-transcribe-lite-macos-x64-0.2.0.zip
-whisper-transcribe-lite-windows-x64-0.2.0.zip
-whisper-transcribe-lite-windows-x64-0.2.0-setup.exe
-whisper-transcribe-lite-linux-x64-0.2.0.AppImage
-whisper-transcribe-lite-linux-x64-0.2.0.tar.gz
+ecotranscribe-desktop-lite-macos-arm64-0.2.0.dmg
+ecotranscribe-desktop-lite-macos-arm64-0.2.0.zip
+ecotranscribe-desktop-lite-macos-x64-0.2.0.dmg
+ecotranscribe-desktop-lite-macos-x64-0.2.0.zip
+ecotranscribe-desktop-lite-windows-x64-0.2.0.zip
+ecotranscribe-desktop-lite-windows-x64-0.2.0-setup.exe
+ecotranscribe-desktop-lite-linux-x64-0.2.0.AppImage
+ecotranscribe-desktop-lite-linux-x64-0.2.0.tar.gz
 SHA256SUMS.txt
 ```
 
@@ -739,14 +759,14 @@ Si la cible est dépassée : vérifier les plugins Qt, les traductions, les doub
 | OS | Mode simple principal | Fallback | Installation | Droits admin |
 |---|---|---|---|---|
 | macOS | DMG, glisser l'app dans `/Applications` | ZIP de l'app | aucune (déplacement) | non pour l'installation ; authentification admin pour « Ouvrir quand même » au premier lancement |
-| Windows | ZIP portable, extraire et lancer `Whisper Transcribe.exe` | Installeur Inno Setup optionnel | aucune pour le ZIP | non |
+| Windows | ZIP portable, extraire et lancer `EcoTranscribe Desktop.exe` | Installeur Inno Setup optionnel | aucune pour le ZIP | non |
 | Linux | AppImage, `chmod +x` puis lancer | archive tar.gz | aucune | non |
 
 Le mode simple est celui qui demande le moins d'étapes et ne nécessite ni Python, ni `uv`, ni `ffmpeg`, ni droits administrateur. Les fallbacks couvrent les environnements qui bloquent FUSE, les parcs Windows gérés ou les utilisateurs qui préfèrent un installeur.
 
 ### 11.2 Contenu du DMG
 
-- `Whisper Transcribe.app`
+- `EcoTranscribe Desktop.app`
 - lien `Applications`
 - `LIRE-MOI-macOS.txt`
 - `LICENSE`
@@ -759,7 +779,7 @@ Le mode simple est celui qui demande le moins d'étapes et ne nécessite ni Pyth
 Le fichier `LIRE-MOI-macOS.txt` est généré au build avec les variables `version`, `build_date`, `commit`, `tag`, `arch`, `project_url`.
 
 ```text
-Whisper Transcribe — édition lite
+EcoTranscribe Desktop — édition lite
 Version {version} — build {build_date}
 Commit : {commit}
 Source : {project_url}
@@ -768,17 +788,17 @@ Cette application est open-source (MIT). Ce binaire n'est pas notarié par Apple
 car le projet ne dispose pas d'un compte Apple Developer payant.
 
 INSTALLATION
-1. Ouvrir le .dmg et glisser « Whisper Transcribe.app » dans /Applications.
+1. Ouvrir le .dmg et glisser « EcoTranscribe Desktop.app » dans /Applications.
 2. Premier lancement :
    - Si macOS affiche « ... ne peut pas être ouverte », ouvrir
      Réglages Système > Confidentialité et sécurité, puis cliquer sur
      « Ouvrir quand même » et s'authentifier.
    - Ou, dans Terminal :
-     xattr -dr com.apple.quarantine "/Applications/Whisper Transcribe.app"
+     xattr -dr com.apple.quarantine "/Applications/EcoTranscribe Desktop.app"
    - Sur macOS 12 à 14, un clic droit sur l'application puis « Ouvrir »
      fonctionne généralement.
 3. Vérifier l'intégrité :
-   shasum -a 256 "whisper-transcribe-lite-macos-{arch}-{version}.dmg"
+   shasum -a 256 "ecotranscribe-desktop-lite-macos-{arch}-{version}.dmg"
    comparer avec SHA256SUMS.txt, fourni avec la release.
 4. Lancer l'application.
 
@@ -806,7 +826,7 @@ La notice est également copiée dans `docs/install-macos-unsigned.md` pour êtr
 ### 11.4 Notice Windows
 
 ```text
-Whisper Transcribe — édition lite
+EcoTranscribe Desktop — édition lite
 Version {version} — build {build_date}
 Source : {project_url}
 
@@ -817,9 +837,9 @@ INSTALLATION
 2. Si Windows affiche « Windows a protégé votre PC », cliquer sur
    « Informations complémentaires » puis « Exécuter quand même ».
 3. Vérifier l'intégrité :
-   certutil -hashfile "whisper-transcribe-lite-windows-x64-{version}.zip" SHA256
+   certutil -hashfile "ecotranscribe-desktop-lite-windows-x64-{version}.zip" SHA256
    comparer avec SHA256SUMS.txt, fourni avec la release.
-4. Lancer « Whisper Transcribe.exe ».
+4. Lancer « EcoTranscribe Desktop.exe ».
 
 DONNÉES
 L'édition lite envoie l'audio à OpenRouter pour transcription. Le prompt est
@@ -829,19 +849,19 @@ envoyé comme contexte lorsque le modèle le supporte (modèles Mistral).
 ### 11.5 Notice Linux
 
 ```text
-Whisper Transcribe — édition lite
+EcoTranscribe Desktop — édition lite
 Version {version} — build {build_date}
 Source : {project_url}
 
 INSTALLATION
 1. Rendre l'AppImage exécutable :
-   chmod +x whisper-transcribe-lite-linux-x64-{version}.AppImage
+   chmod +x ecotranscribe-desktop-lite-linux-x64-{version}.AppImage
 2. Lancer :
-   ./whisper-transcribe-lite-linux-x64-{version}.AppImage
+   ./ecotranscribe-desktop-lite-linux-x64-{version}.AppImage
 3. Si FUSE n'est pas disponible :
-   ./whisper-transcribe-lite-linux-x64-{version}.AppImage --appimage-extract-and-run
+   ./ecotranscribe-desktop-lite-linux-x64-{version}.AppImage --appimage-extract-and-run
 4. Vérifier l'intégrité :
-   sha256sum whisper-transcribe-lite-linux-x64-{version}.AppImage
+   sha256sum ecotranscribe-desktop-lite-linux-x64-{version}.AppImage
    comparer avec SHA256SUMS.txt, fourni avec la release.
 ```
 
@@ -857,7 +877,7 @@ INSTALLATION
 Modèle :
 
 ```markdown
-## Whisper Transcribe 0.2.0 — édition lite
+## EcoTranscribe Desktop 0.2.0 — édition lite
 
 Application desktop OpenRouter pour macOS, Windows et Linux.
 
@@ -870,7 +890,7 @@ Application desktop OpenRouter pour macOS, Windows et Linux.
 ### Installation macOS
 Ce build est open-source mais non notarié. Voir la notice incluse :
 Réglages Système > Confidentialité et sécurité > « Ouvrir quand même »,
-ou `xattr -dr com.apple.quarantine "/Applications/Whisper Transcribe.app"`.
+ou `xattr -dr com.apple.quarantine "/Applications/EcoTranscribe Desktop.app"`.
 
 ### Vérification
 `SHA256SUMS.txt` est joint à la release.
@@ -939,7 +959,7 @@ Avec `pytest-qt` et un `DialogService` factice :
 ### 12.5 Checklist d'acceptation
 
 - [ ] `uv run pytest` passe sur macOS, Windows et Linux.
-- [ ] `uv run transcribe-gui` ouvre la fenêtre en développement.
+- [ ] `uv run ecotranscribe-desktop` ouvre la fenêtre en développement.
 - [ ] L'artefact lite se lance sur chaque OS sans Python/uv/ffmpeg installés.
 - [ ] Le ZIP Windows s'extrait et se lance sans droits administrateur.
 - [ ] L'AppImage Linux se lance après `chmod +x`, sans root.
@@ -959,16 +979,17 @@ Avec `pytest-qt` et un `DialogService` factice :
 
 | Fichier | Contenu |
 |---|---|
-| `README.md` | présentation lite/full, installation, clé OpenRouter, usage, build, tests, licence |
+| `README.md` | présentation lite/full, nommage EcoTranscribe, installation, clé OpenRouter, usage, build, tests, licence |
 | `docs/install-macos-unsigned.md` | notice macOS complète, Gatekeeper, `xattr`, SHA256, sécurité |
 | `docs/distribution.md` | build local, fetch ffmpeg, signature ad-hoc, DMG, release, checklist |
 | `THIRD_PARTY_NOTICES.md` | PySide6/Qt LGPL, ffmpeg, Python, keyring |
 | `SECURITY.md` | binaire non notarié, vérification, signalement de vulnérabilité |
-| `CHANGELOG.md` | entrée 0.2.0 : ajout GUI lite, extra `[whisper]`, distribution macOS ad-hoc |
+| `CHANGELOG.md` | entrée 0.2.0 : renommage EcoTranscribe, ajout GUI lite, extra `[whisper]`, distribution macOS ad-hoc |
 | `LICENSE` | MIT |
 
 Le README doit indiquer clairement :
 
+- le nommage EcoTranscribe : commande CLI `ecotranscribe`, application `EcoTranscribe Desktop` et entrée `ecotranscribe-desktop` ;
 - `uv sync --extra gui` pour la GUI lite ;
 - `uv sync --extra whisper` pour le CLI Whisper ;
 - `uv sync --extra gui --extra whisper` pour le build full ;
@@ -1008,14 +1029,14 @@ Le README doit indiquer clairement :
 - Déplacer `argparse` dans `cli.py`.
 - Déplacer `openai-whisper` dans l'extra `[whisper]`.
 - Conserver le comportement du CLI et les tests existants.
-- Critère de sortie : `uv run pytest` passe ; `transcribe --provider openrouter` fonctionne ; `transcribe` explique l'extra manquant.
+- Critère de sortie : `uv run pytest` passe ; `ecotranscribe --provider openrouter` fonctionne ; `ecotranscribe` explique l'extra manquant.
 
 ### Phase 1 — GUI lite
 
 - Ajouter `gui/` (fenêtre, worker, settings, keyring, disponibilité, logs).
 - Implémenter la validation, l'écrasement, la progression, l'annulation, le coût.
 - Ajouter les tests `pytest-qt`.
-- Critère de sortie : `uv run transcribe-gui` transcrit `data/sample.mp4` via OpenRouter et produit les sorties attendues.
+- Critère de sortie : `uv run ecotranscribe-desktop` transcrit `data/sample.mp4` via OpenRouter et produit les sorties attendues.
 
 ### Phase 2 — Packaging macOS ad-hoc
 
@@ -1053,6 +1074,7 @@ Le README doit indiquer clairement :
 
 ## 17. Décisions résolues
 
+- Nom : EcoTranscribe ; paquet/CLI `ecotranscribe`, application `EcoTranscribe Desktop` (entrée `ecotranscribe-desktop`), bundle macOS `app.ecotranscribe.desktop`.
 - Framework : PySide6-Essentials.
 - Packaging : PyInstaller onedir.
 - Moteur lite : OpenRouter uniquement.
