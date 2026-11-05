@@ -11,12 +11,12 @@ from pathlib import Path
 from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QApplication
 
-from ..core.config import APP_NAME, APP_SLUG
-from .availability import collect_diagnostic
-from .dialogs import QtDialogService
-from .logging_setup import configure_logging
-from .main_window import MainWindow
-from .settings import AppSettings, KeyringStore
+from ecotranscribe.core.config import APP_NAME, APP_SLUG
+from ecotranscribe.gui.availability import collect_diagnostic
+from ecotranscribe.gui.dialogs import QtDialogService
+from ecotranscribe.gui.logging_setup import configure_logging
+from ecotranscribe.gui.main_window import MainWindow
+from ecotranscribe.gui.settings import AppSettings, KeyringStore
 
 
 def build_parser() -> argparse.ArgumentParser:
