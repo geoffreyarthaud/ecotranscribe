@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "targets": {
+    "darwin-arm64": {
+      "sources": [
+        {
+          "url": "https://www.osxexperts.net/ffmpeg902arm.zip",
+          "sha256": "07e00300593799005b060c03a99fe648b1edda0f30c36b0c1adafe8e3247e586",
+          "type": "zip",
+          "files": {
+            "ffmpeg": "ffmpeg"
+          }
+        },
+        {
+          "url": "https://www.osxexperts.net/ffprobe902arm.zip",
+          "sha256": "ec72b6a81dac926bd568681d766b74943701f291ac3cdbb387829dc2a275a00b",
+          "type": "zip",
+          "files": {
+            "ffprobe": "ffprobe"
+          }
+        }
+      ]
+    },
+    "darwin-x64": {
+      "sources": [
+        {
+          "url": "https://www.osxexperts.net/ffmpeg80intel.zip",
+          "sha256": "2d24d22db78c87f394a5822867acd5c5dc5e762cd261a44bd26923f3a5af3e07",
+          "type": "zip",
+          "files": {
+            "ffmpeg": "ffmpeg"
+          }
+        },
+        {
+          "url": "https://www.osxexperts.net/ffprobe80intel.zip",
+          "sha256": "0b6576104a95c1b39d4939e2df86f8f7cf1d55287ff57da48777d94605d12feb",
+          "type": "zip",
+          "files": {
+            "ffprobe": "ffprobe"
+          }
+        }
+      ]
+    },
+    "win-x64": {
+      "sources": [
+        {
+          "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-11-05-12-48/ffmpeg-n9.0.2-47-gb204e94e90-win64-lgpl-9.0.zip",
+          "sha256": "9d557b1a39b9db87ff9b5cf7a4c2c3fd42e5f3d21c68714b2dd6e104bd48f715",
+          "type": "zip",
+          "files": {
+            "ffmpeg": "ffmpeg-n9.0.2-47-gb204e94e90-win64-lgpl-9.0/bin/ffmpeg.exe",
+            "ffprobe": "ffmpeg-n9.0.2-47-gb204e94e90-win64-lgpl-9.0/bin/ffprobe.exe"
+          }
+        }
+      ]
+    },
+    "linux-x64": {
+      "sources": [
+        {
+          "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-11-05-12-48/ffmpeg-n9.0.2-47-gb204e94e90-linux64-lgpl-9.0.tar.xz",
+          "sha256": "06ef07fd9252e42ae0d5cd5d47c7b39db3e4264a792a2e4dbf56b36d3cbce5f5",
+          "type": "tar.xz",
+          "files": {
+            "ffmpeg": "ffmpeg-n9.0.2-47-gb204e94e90-linux64-lgpl-9.0/bin/ffmpeg",
+            "ffprobe": "ffmpeg-n9.0.2-47-gb204e94e90-linux64-lgpl-9.0/bin/ffprobe"
+          }
+        }
+      ]
+    }
+  }
+}
