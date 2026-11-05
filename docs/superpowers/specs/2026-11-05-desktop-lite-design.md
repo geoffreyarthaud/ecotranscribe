@@ -27,6 +27,7 @@ L'objectif est de fournir une application de bureau aux collègues qui n'ont ni 
 - Produire exactement les mêmes fichiers SRT/TXT que le CLI pour une même entrée.
 - Embarquer `ffmpeg` et `ffprobe` dans l'artefact.
 - Distribuer sur macOS un `.app` signé ad-hoc, avec DMG, notice et SHA256, sans notarisation.
+- Proposer un mode de distribution simple, sans installation ni droits administrateur, sur Windows (ZIP portable) et Linux (AppImage), avec un fallback respectif (installeur Inno Setup optionnel, archive tar.gz).
 - Garder un artefact lite petit : pas de torch, pas de Whisper, pas de modèle local.
 - Préserver le CLI et permettre plus tard un build full avec Whisper.
 - Rester open-source (MIT) et reproductible via GitHub Actions.
@@ -56,8 +57,8 @@ L'objectif est de fournir une application de bureau aux collègues qui n'ont ni 
 | Writers | internes au projet | supprime l'import de `whisper.utils.get_writer` |
 | Signature macOS | ad-hoc (`codesign --sign -`) | aucun compte Apple Developer requis |
 | Distribution macOS | DMG + ZIP + notice | gratuit, vérifiable, adapté à quelques collègues |
-| Distribution Windows | ZIP portable + installeur Inno Setup | pas de signature, notice SmartScreen |
-| Distribution Linux | AppImage + tar.gz | portable, pas de dépôt |
+| Distribution Windows | ZIP portable principal ; installeur Inno Setup optionnel | mode simple sans admin ; l'installeur ajoute raccourci/désinstallation |
+| Distribution Linux | AppImage principal ; tar.gz en fallback | un seul fichier, sans root ; fallback si FUSE/glibc |
 | Clé API | keyring + `OPENROUTER_API_KEY` | pas de secret en clair |
 | UI | français | public initial francophone |
 | Tâches | une seule à la fois | évite les accès concurrents à ffmpeg et aux réglages |
@@ -650,21 +651,26 @@ Contraintes :
 - La notice doit être incluse dans le DMG et dans le ZIP.
 - Le build doit être reproductible à partir du tag.
 
-### 10.5 Windows
+### 10.5 Windows : ZIP portable
 
-- PyInstaller onedir.
+**Mode simple principal** : le ZIP portable. L'utilisateur extrait l'archive où il veut et lance `Whisper Transcribe.exe`. Aucune installation, aucun droit administrateur, aucun runtime à installer.
+
+- PyInstaller onedir, pas de `--onefile`.
 - ZIP portable `whisper-transcribe-lite-windows-x64-0.2.0.zip`.
-- Installeur Inno Setup `whisper-transcribe-lite-windows-x64-0.2.0-setup.exe` (sans signature).
+- L'archive contient le dossier complet `Whisper Transcribe/` avec l'exécutable, `_internal/`, `bin/ffmpeg.exe`, `bin/ffprobe.exe`, la notice et les licences.
+- Installeur Inno Setup `whisper-transcribe-lite-windows-x64-0.2.0-setup.exe` : optionnel, pour un raccourci menu Démarrer et une désinstallation propre. Il n'est pas le mode principal.
 - `LIRE-MOI-Windows.txt` avec la procédure SmartScreen et le SHA256.
 - `CREATE_NO_WINDOW` pour tous les sous-processus.
 - Tester sur Windows 10 21H2+ et Windows 11 x64.
-- Vérifier qu'aucune fenêtre console n'apparaît au lancement.
+- Vérifier qu'aucune fenêtre console n'apparaît au lancement et que le ZIP fonctionne sans admin.
 
-### 10.6 Linux
+### 10.6 Linux : AppImage
+
+**Mode simple principal** : l'AppImage. Un seul fichier, `chmod +x`, double-clic ou lancement direct. Aucune installation, aucun root, aucun paquet système.
 
 - PyInstaller onedir.
 - AppImage `whisper-transcribe-lite-linux-x64-0.2.0.AppImage`.
-- Archive `whisper-transcribe-lite-linux-x64-0.2.0.tar.gz`.
+- Archive `whisper-transcribe-lite-linux-x64-0.2.0.tar.gz` : fallback si FUSE est absent ou si le système refuse l'AppImage.
 - `LIRE-MOI-Linux.txt` avec `chmod +x`, lancement, note FUSE et SHA256.
 - Construire sur Ubuntu 22.04 pour maximiser la compatibilité glibc.
 - Tester sur Ubuntu 22.04 et 24.04, X11 et Wayland.
@@ -725,7 +731,17 @@ Si la cible est dépassée : vérifier les plugins Qt, les traductions, les doub
 
 ## 11. Distribution et notice
 
-### 11.1 Contenu du DMG
+### 11.1 Modes de distribution
+
+| OS | Mode simple principal | Fallback | Installation | Droits admin |
+|---|---|---|---|---|
+| macOS | DMG, glisser l'app dans `/Applications` | ZIP de l'app | aucune (déplacement) | non pour l'installation ; authentification admin pour « Ouvrir quand même » au premier lancement |
+| Windows | ZIP portable, extraire et lancer `Whisper Transcribe.exe` | Installeur Inno Setup optionnel | aucune pour le ZIP | non |
+| Linux | AppImage, `chmod +x` puis lancer | archive tar.gz | aucune | non |
+
+Le mode simple est celui qui demande le moins d'étapes et ne nécessite ni Python, ni `uv`, ni `ffmpeg`, ni droits administrateur. Les fallbacks couvrent les environnements qui bloquent FUSE, les parcs Windows gérés ou les utilisateurs qui préfèrent un installeur.
+
+### 11.2 Contenu du DMG
 
 - `Whisper Transcribe.app`
 - lien `Applications`
@@ -735,7 +751,7 @@ Si la cible est dépassée : vérifier les plugins Qt, les traductions, les doub
 
 `SHA256SUMS.txt` est publié comme asset de la release, pas dans le DMG : il contient le hash du DMG lui-même et ne peut donc pas y être inclus.
 
-### 11.2 Notice macOS
+### 11.3 Notice macOS
 
 Le fichier `LIRE-MOI-macOS.txt` est généré au build avec les variables `version`, `build_date`, `commit`, `tag`, `arch`, `project_url`.
 
@@ -784,7 +800,7 @@ si vous cochez « Mémoriser ».
 
 La notice est également copiée dans `docs/install-macos-unsigned.md` pour être lisible en ligne.
 
-### 11.3 Notice Windows
+### 11.4 Notice Windows
 
 ```text
 Whisper Transcribe — édition lite
@@ -807,7 +823,7 @@ L'édition lite envoie l'audio à OpenRouter pour transcription. Le prompt est
 envoyé comme contexte lorsque le modèle le supporte (modèles Mistral).
 ```
 
-### 11.4 Notice Linux
+### 11.5 Notice Linux
 
 ```text
 Whisper Transcribe — édition lite
@@ -826,14 +842,14 @@ INSTALLATION
    comparer avec SHA256SUMS.txt, fourni avec la release.
 ```
 
-### 11.5 SHA256
+### 11.6 SHA256
 
 - `SHA256SUMS.txt` contient une ligne par artefact, au format `hash  filename`.
 - Généré par le workflow après packaging.
 - Publié comme asset de la release ; il ne peut pas contenir le hash du DMG qui le contient, donc il n'est pas inclus dans le DMG.
 - Les notices et les release notes y font référence et rappellent la commande de vérification par OS.
 
-### 11.6 Release notes
+### 11.7 Release notes
 
 Modèle :
 
@@ -921,6 +937,8 @@ Avec `pytest-qt` et un `DialogService` factice :
 - [ ] `uv run pytest` passe sur macOS, Windows et Linux.
 - [ ] `uv run transcribe-gui` ouvre la fenêtre en développement.
 - [ ] L'artefact lite se lance sur chaque OS sans Python/uv/ffmpeg installés.
+- [ ] Le ZIP Windows s'extrait et se lance sans droits administrateur.
+- [ ] L'AppImage Linux se lance après `chmod +x`, sans root.
 - [ ] Whisper est désactivé avec la raison attendue.
 - [ ] OpenRouter transcrit `data/sample.mp4` et produit les sorties attendues.
 - [ ] L'annulation ne laisse aucun fichier de sortie ni fichier temporaire.
