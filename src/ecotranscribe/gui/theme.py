@@ -123,9 +123,19 @@ _QSS = Template(
         background: transparent; color: $error; border-color: $error;
     }
     QPushButton[variant="danger"]:hover { background: $error_soft; }
-    QPushButton:focus { border-color: $text_title; }
+    QPushButton:focus {
+        background: $primary; color: $on_primary; border-color: $on_primary;
+    }
     QPushButton[variant="primary"]:focus { border-color: $on_primary; }
-    QPushButton[variant="secondary"]:focus { border-color: $text_title; }
+    QPushButton[variant="secondary"]:focus {
+        background: $primary; color: $on_primary; border-color: $on_primary;
+    }
+    QPushButton[variant="tertiary"]:focus {
+        background: $primary_soft; color: $primary; border-color: $text_title;
+    }
+    QPushButton[variant="danger"]:focus {
+        background: $error_soft; color: $error; border-color: $text_title;
+    }
     QPushButton:disabled {
         background: $surface_contrast; color: $text_disabled;
         border-color: $surface_contrast;
