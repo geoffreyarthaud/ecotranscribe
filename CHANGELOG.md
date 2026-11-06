@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.0 — 2026-11-06
+
+### Modifié
+
+- Interface refondue en assistant à six écrans : accueil, clé conditionnelle,
+  fichier/prompt, réglages, progression, fin.
+- Page Options (clé OpenRouter et à propos) accessible depuis l'accueil et
+  l'engrenage, hors parcours.
+- Progression avec journal permanent, annulation coopérative et erreurs
+  inline avec hint, détail technique et accès au journal.
+- Thème Qt inspiré des principes du DSFR (non officiel), clair/sombre, sans
+  police, code, logo ni asset DSFR.
+- Suppression du sélecteur de fournisseur, de la mention Whisper et du badge
+  d'édition lite dans l'interface.
+- La clé mémorisée n'est plus préremplie ; les réglages non secrets sont
+  conservés à la fermeture ; `ui/log_visible` est supprimé.
+
 ## Non publié — 2026-11-06
 
 ### Ajouté

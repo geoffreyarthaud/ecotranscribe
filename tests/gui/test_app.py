@@ -81,3 +81,9 @@ def test_diagnose_writes_utf8(
 def test_parser_rejects_unknown_option() -> None:
     with pytest.raises(SystemExit):
         main(["--unknown"])
+
+
+def test_parser_description_has_no_lite_or_provider() -> None:
+    description = (app_module.build_parser().description or "").lower()
+    assert "lite" not in description
+    assert "openrouter" not in description

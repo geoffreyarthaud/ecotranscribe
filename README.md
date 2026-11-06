@@ -116,20 +116,28 @@ trousseau système et de la supprimer. Priorité : champ de l'application >
 trousseau > `OPENROUTER_API_KEY`. La clé n'est jamais écrite dans
 `QSettings`, les logs ou les détails d'erreur.
 
-## Application desktop
+## Interface graphique
 
-`uv run ecotranscribe-desktop` ouvre la fenêtre. Le fournisseur OpenRouter est
-sélectionné par défaut ; Whisper est visible, désactivé, avec la raison
-« non inclus dans l'édition lite » et un lien vers cette documentation.
+`uv run ecotranscribe-desktop` ouvre un assistant en six écrans :
 
-Réglages persistants : géométrie, dernier dossier, dossier de sortie, modèle,
-langue, formats, mémorisation de la clé, journal et cinq derniers modèles.
-La langue `Auto` omet le champ `language` de la requête OpenRouter.
+1. **Accueil** : transcrire un fichier, transcrire une URL (bientôt
+   disponible), options.
+2. **Clé OpenRouter** : affiché uniquement si aucune clé active (trousseau,
+   session ou `OPENROUTER_API_KEY`).
+3. **Fichier et prompt** : chemin, durée, prompt optionnel détecté et
+   éditable.
+4. **Réglages** : modèle, langue, SRT/TXT, dossier de sortie.
+5. **Progression** : phases, journal, annulation, erreurs inline.
+6. **Fin** : fichiers produits, coût, ouverture du dossier.
 
-La liste propose `mistralai/voxtral-small-transcribe-3-0` (défaut) et
-`mistralai/voxtral-mini-transcribe-3-0`. Le tarif horaire approximatif affiché
-entre parenthèses est récupéré de façon asynchrone depuis l'API publique
-OpenRouter ; en cas d'échec réseau, la liste reste utilisable sans tarif.
+La clé peut être mémorisée dans le trousseau ou fournie par
+`OPENROUTER_API_KEY` ; elle n'est jamais écrite dans les réglages ni dans le
+journal. Les réglages non secrets sont conservés entre les lancements.
+
+Le thème est **inspiré des principes du DSFR**, sans utiliser son code, ses
+composants, sa police Marianne, son logo ni ses assets. L'application ne
+revendique pas une conformité DSFR et ne se présente pas comme un service de
+l'État.
 
 Diagnostic sans fenêtre :
 

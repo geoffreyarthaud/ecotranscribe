@@ -18,12 +18,13 @@ from ecotranscribe.gui.logging_setup import configure_logging
 from ecotranscribe.gui.main_window import MainWindow
 from ecotranscribe.gui.pricing import OpenRouterPricingClient
 from ecotranscribe.gui.settings import AppSettings, KeyringStore
+from ecotranscribe.gui.theme import ThemeManager, apply_theme
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="ecotranscribe-desktop",
-        description="EcoTranscribe Desktop — édition lite OpenRouter.",
+        description="EcoTranscribe Desktop.",
     )
     parser.add_argument(
         "--diagnose",
@@ -67,6 +68,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     app.setOrganizationName(APP_SLUG)
 
     configure_logging()
+    apply_theme(app)
+    theme_manager = ThemeManager(app)
     window = MainWindow(
         settings=AppSettings(QSettings()),
         key_store=KeyringStore(),
