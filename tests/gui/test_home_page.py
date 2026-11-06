@@ -9,7 +9,7 @@ def test_home_page_emits_file_requests(qtbot) -> None:
     page = HomePage()
     qtbot.addWidget(page)
     with qtbot.waitSignal(page.browse_requested):
-        page.file_card.browse_button.click()
+        page.file_card.clicked.emit()
     page.set_selected_file(Path("/tmp/a.mp3"))
     with qtbot.waitSignal(page.continue_requested):
         page.file_card.continue_button.click()

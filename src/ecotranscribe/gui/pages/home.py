@@ -27,7 +27,7 @@ class HomePage(WizardPage):
         self.file_card = FileCard(
             "Transcrire un fichier",
             "Formats audio et vidéo : MP3, WAV, M4A, MP4, MOV… "
-            "Glissez-déposez un fichier ou choisissez-le.",
+            "Glissez-déposez un fichier ou cliquez pour le choisir.",
         )
         self.url_card = DisabledCard(
             "Transcrire une URL", "Bientôt disponible"
@@ -53,7 +53,6 @@ class HomePage(WizardPage):
         self.content_layout.addStretch(1)
 
         self.file_card.clicked.connect(self._on_card_clicked)
-        self.file_card.browse_requested.connect(self.browse_requested)
         self.file_card.continue_requested.connect(self.continue_requested)
         self.file_card.change_requested.connect(self.change_file_requested)
         self.key_note_button.clicked.connect(self.options_requested)
@@ -71,7 +70,7 @@ class HomePage(WizardPage):
             "Fichier sélectionné. Continuez ou changez de fichier."
             if path is not None
             else "Formats audio et vidéo : MP3, WAV, M4A, MP4, MOV… "
-            "Glissez-déposez un fichier ou choisissez-le."
+            "Glissez-déposez un fichier ou cliquez pour le choisir."
         )
 
     def set_has_key(self, has_key: bool) -> None:
@@ -86,4 +85,4 @@ class HomePage(WizardPage):
         if self._has_file:
             self.file_card.continue_button.setFocus()
         else:
-            self.file_card.browse_button.setFocus()
+            self.file_card.setFocus()

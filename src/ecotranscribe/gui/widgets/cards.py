@@ -18,7 +18,6 @@ from PySide6.QtWidgets import (
 
 class FileCard(QFrame):
     clicked = Signal()
-    browse_requested = Signal()
     continue_requested = Signal()
     change_requested = Signal()
 
@@ -45,15 +44,12 @@ class FileCard(QFrame):
         self.path_label = QLabel("")
         self.path_label.setProperty("role", "mention")
         self.path_label.setWordWrap(True)
-        self.browse_button = QPushButton("Choisir un fichier")
-        self.browse_button.setProperty("variant", "primary")
         self.continue_button = QPushButton("Continuer")
         self.continue_button.setProperty("variant", "primary")
         self.change_button = QPushButton("Changer de fichier")
         self.change_button.setProperty("variant", "secondary")
 
         buttons = QHBoxLayout()
-        buttons.addWidget(self.browse_button)
         buttons.addWidget(self.continue_button)
         buttons.addWidget(self.change_button)
         buttons.addStretch(1)
@@ -65,7 +61,6 @@ class FileCard(QFrame):
 
         for label in (self.title_label, self.description_label, self.path_label):
             label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self.browse_button.clicked.connect(self.browse_requested)
         self.continue_button.clicked.connect(self.continue_requested)
         self.change_button.clicked.connect(self.change_requested)
         self.set_selected_file(None)
@@ -74,7 +69,6 @@ class FileCard(QFrame):
         has_file = path is not None
         self.path_label.setText(str(path) if path is not None else "")
         self.path_label.setVisible(has_file)
-        self.browse_button.setVisible(not has_file)
         self.continue_button.setVisible(has_file)
         self.change_button.setVisible(has_file)
 

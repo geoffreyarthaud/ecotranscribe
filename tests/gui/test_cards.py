@@ -21,8 +21,9 @@ def test_file_card_clears_selection(qtbot) -> None:
     card.set_selected_file(Path("/tmp/a.mp3"))
     card.set_selected_file(None)
     assert card.path_label.text() == ""
-    assert card.browse_button.isVisibleTo(card)
     assert card.continue_button.isHidden()
+    assert card.change_button.isHidden()
+    assert card.focusPolicy() == Qt.FocusPolicy.StrongFocus
 
 
 def test_disabled_card_is_not_focusable(qtbot) -> None:
