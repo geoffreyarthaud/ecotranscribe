@@ -98,8 +98,10 @@ _QSS = Template(
     }
     QPushButton {
         min-height: 40px; padding: 7px 15px; border-radius: 0;
-        border: 2px solid transparent; font-weight: 500;
+        background: $surface; color: $primary; border: 2px solid $primary;
+        font-weight: 500;
     }
+    QPushButton:hover { background: $primary_soft; }
     QPushButton[variant="primary"] {
         background: $primary; color: $on_primary; border-color: $primary;
     }
@@ -121,7 +123,9 @@ _QSS = Template(
         background: transparent; color: $error; border-color: $error;
     }
     QPushButton[variant="danger"]:hover { background: $error_soft; }
-    QPushButton:focus { border-color: $focus; }
+    QPushButton:focus { border-color: $text_title; }
+    QPushButton[variant="primary"]:focus { border-color: $on_primary; }
+    QPushButton[variant="secondary"]:focus { border-color: $text_title; }
     QPushButton:disabled {
         background: $surface_contrast; color: $text_disabled;
         border-color: $surface_contrast;
