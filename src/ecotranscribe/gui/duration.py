@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -15,26 +16,61 @@ logger = logging.getLogger("ecotranscribe")
 
 ProbeFn = Callable[[Path, CancelToken], float | None]
 
+_SHUTDOWN_BUDGET_S = 0.1
 
-class _ProbeWorker(QObject):
-    done = Signal(object, object)
-    failed = Signal(object, str)
+# Registre module-level des threads vivants : garantit qu'un thread en cours
+# n'est pas récupéré par le GC quand le DurationProbe est détruit ou que son
+# budget d'arrêt est dépassé. Nettoyé par _ThreadReaper à la fin du thread.
+_ACTIVE_THREADS: set[QThread] = set()
 
-    def __init__(self, path: Path, probe: ProbeFn, cancel: CancelToken) -> None:
+
+class _ThreadReaper(QObject):
+    """Retire les threads terminés du registre, sur le thread graphique."""
+
+    @Slot()
+    def retire(self) -> None:
+        thread = self.sender()
+        if isinstance(thread, QThread):
+            _ACTIVE_THREADS.discard(thread)
+
+
+_reaper: _ThreadReaper | None = None
+
+
+def _thread_reaper() -> _ThreadReaper:
+    global _reaper
+    if _reaper is None:
+        _reaper = _ThreadReaper()
+    return _reaper
+
+
+class _ProbeThread(QThread):
+    """Thread autoporteur : aucune ressource à détruire dans un autre thread."""
+
+    done = Signal(int, object, object)
+    failed = Signal(int, object, str)
+
+    def __init__(
+        self,
+        request: int,
+        path: Path,
+        probe: ProbeFn,
+        cancel: CancelToken,
+    ) -> None:
         super().__init__()
+        self._request = request
         self._path = path
         self._probe = probe
         self._cancel = cancel
 
-    @Slot()
     def run(self) -> None:
         try:
             value = self._probe(self._path, self._cancel)
         except Exception as exc:
             logger.warning("Durée indisponible pour %s : %s", self._path, exc)
-            self.failed.emit(self._path, str(exc))
-        else:
-            self.done.emit(self._path, value)
+            self.failed.emit(self._request, self._path, str(exc))
+            return
+        self.done.emit(self._request, self._path, value)
 
 
 class DurationProbe(QObject):
@@ -48,28 +84,25 @@ class DurationProbe(QObject):
     ) -> None:
         super().__init__(parent)
         self._probe = probe or _default_probe
-        self._current: Path | None = None
+        self._request = 0
+        self._pending: int | None = None
         self._cancel: CancelToken | None = None
-        self._threads: set[tuple[QThread, _ProbeWorker]] = set()
+        self._threads: set[QThread] = set()
 
     def start(self, path: Path) -> None:
         self.cancel()
         path = Path(path)
-        self._current = path
+        self._request += 1
+        request = self._request
+        self._pending = request
         cancel = CancelToken()
-        thread = QThread()
-        worker = _ProbeWorker(path, self._probe, cancel)
-        worker.moveToThread(thread)
-        thread.started.connect(worker.run)
-        worker.done.connect(self._on_done)
-        worker.failed.connect(self._on_failed)
-        worker.done.connect(thread.quit)
-        worker.failed.connect(thread.quit)
-        thread.finished.connect(worker.deleteLater)
-        thread.finished.connect(thread.deleteLater)
-        job = (thread, worker)
-        self._threads.add(job)
-        thread.finished.connect(lambda: self._threads.discard(job))
+        thread = _ProbeThread(request, path, self._probe, cancel)
+        thread.done.connect(self._on_done)
+        thread.failed.connect(self._on_failed)
+        thread.finished.connect(_thread_reaper().retire)
+        thread.finished.connect(self._on_thread_finished)
+        self._threads.add(thread)
+        _ACTIVE_THREADS.add(thread)
         self._cancel = cancel
         thread.start()
 
@@ -77,29 +110,60 @@ class DurationProbe(QObject):
         if self._cancel is not None:
             self._cancel.cancel()
         self._cancel = None
-        self._current = None
+        self._pending = None
 
     def shutdown(self) -> None:
+        """Annule la sonde en cours et borne l'attente totale à 100 ms.
+
+        Une sonde qui ignore le ``CancelToken`` continue de tourner : son
+        QThread n'est ni tué ni récupéré, il reste retenu par le registre
+        module-level jusqu'à la fin du thread.
+        """
         self.cancel()
-        for thread, _worker in list(self._threads):
+        threads = list(self._threads)
+        if not threads:
+            return
+        for thread in threads:
             thread.quit()
-            thread.wait(1000)
+        deadline = time.monotonic() + _SHUTDOWN_BUDGET_S
+        for thread in threads:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            thread.wait(max(1, int(remaining * 1000)))
 
-    def _on_done(self, path: object, value: object) -> None:
-        path = Path(path)
-        if self._current != path:
+    @Slot(int, object, object)
+    def _on_done(self, request: int, path: object, value: object) -> None:
+        if request != self._pending:
             return
-        self._current = None
+        path = Path(path)
+        self._pending = None
         self._cancel = None
-        self.ready.emit(path, None if value is None else float(value))
-
-    def _on_failed(self, path: object, message: str) -> None:
-        path = Path(path)
-        if self._current != path:
+        if value is None:
+            self.ready.emit(path, None)
             return
-        self._current = None
+        try:
+            duration = float(value)
+        except (TypeError, ValueError) as exc:
+            logger.warning("Durée invalide pour %s : %r", path, value)
+            self.failed.emit(path, str(exc))
+            return
+        self.ready.emit(path, duration)
+
+    @Slot(int, object, str)
+    def _on_failed(self, request: int, path: object, message: str) -> None:
+        if request != self._pending:
+            return
+        path = Path(path)
+        self._pending = None
         self._cancel = None
         self.failed.emit(path, message)
+
+    @Slot()
+    def _on_thread_finished(self) -> None:
+        thread = self.sender()
+        if isinstance(thread, QThread):
+            self._threads.discard(thread)
 
 
 def _default_probe(path: Path, cancel: CancelToken) -> float | None:
