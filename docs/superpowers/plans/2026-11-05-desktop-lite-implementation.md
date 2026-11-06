@@ -8,6 +8,9 @@
 
 **Tech Stack:** Python ≥ 3.10 (CI et dev sur 3.13), `rich`, PySide6-Essentials 6.7–6.x, `keyring` 25+, pytest/pytest-qt, PyInstaller 6+, `uv`, GitHub Actions.
 
+> **Mise à jour (2026-11-06) :** le prérequis courant est Python ≥ 3.13 ; les
+> mentions 3.10 de ce plan historique décrivent l'implémentation initiale.
+
 **Spec:** `docs/superpowers/specs/2026-11-05-desktop-lite-design.md` (commit 93cc2dd)
 
 ## Contraintes globales
