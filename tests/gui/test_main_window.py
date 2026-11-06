@@ -78,6 +78,8 @@ def test_home_without_key_shows_note(qtbot, app_settings, monkeypatch) -> None:
     assert window.current_page is PageId.HOME
     assert window.home_page.key_note.isVisibleTo(window.home_page)
     assert window.gear_button.isVisibleTo(window)
+    assert not window.gear_button.icon().isNull()
+    assert window.gear_button.text() == ""
 
 
 def test_select_file_with_key_skips_key_page(qtbot, app_settings, tmp_path) -> None:

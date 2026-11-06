@@ -135,9 +135,10 @@ La clé peut être mémorisée dans le trousseau ou fournie par
 journal. Les réglages non secrets sont conservés entre les lancements.
 
 Le thème est **inspiré des principes du DSFR**, sans utiliser son code, ses
-composants, sa police Marianne, son logo ni ses assets. L'application ne
-revendique pas une conformité DSFR et ne se présente pas comme un service de
-l'État.
+composants, son logo ni ses assets. La police Marianne est utilisée si elle
+est installée sur le système, sans être embarquée ; Arial sert de repli.
+L'application ne revendique pas une conformité DSFR et ne se présente pas
+comme un service de l'État.
 
 Diagnostic sans fenêtre :
 

@@ -39,8 +39,6 @@ class HomePage(WizardPage):
         self.key_note.setWordWrap(True)
         self.key_note_button = QPushButton("Configurer la clé")
         self.key_note_button.setProperty("variant", "tertiary")
-        self.options_button = QPushButton("Options")
-        self.options_button.setProperty("variant", "tertiary")
         self.error_label = QLabel("")
         self.error_label.setProperty("role", "error")
         self.error_label.setWordWrap(True)
@@ -53,13 +51,11 @@ class HomePage(WizardPage):
         self.content_layout.addWidget(self.key_note_button)
         self.content_layout.addWidget(self.error_label)
         self.content_layout.addStretch(1)
-        self.content_layout.addWidget(self.options_button)
 
         self.file_card.clicked.connect(self._on_card_clicked)
         self.file_card.browse_requested.connect(self.browse_requested)
         self.file_card.continue_requested.connect(self.continue_requested)
         self.file_card.change_requested.connect(self.change_file_requested)
-        self.options_button.clicked.connect(self.options_requested)
         self.key_note_button.clicked.connect(self.options_requested)
 
     def _on_card_clicked(self) -> None:

@@ -33,12 +33,10 @@ def test_key_note_and_options(qtbot) -> None:
     page.set_has_key(False)
     assert page.key_note.isVisibleTo(page)
     assert page.key_note_button.isVisibleTo(page)
-    page.set_has_key(True)
-    assert page.key_note.isHidden()
-    with qtbot.waitSignal(page.options_requested):
-        page.options_button.click()
     with qtbot.waitSignal(page.options_requested):
         page.key_note_button.click()
+    page.set_has_key(True)
+    assert page.key_note.isHidden()
 
 
 def test_home_error_is_inline(qtbot) -> None:

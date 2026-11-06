@@ -1,7 +1,9 @@
 """Thème Qt original inspiré des principes visuels du DSFR.
 
-Aucun code, composant, logo ou police du DSFR n'est utilisé. Les valeurs de
-couleur sont des références visuelles issues de la documentation publique.
+Aucun code, composant, logo ou asset du DSFR n'est utilisé. La police
+Marianne est utilisée si elle est installée sur le système, sans être
+embarquée ; Arial sert de repli. Les valeurs de couleur sont des références
+visuelles issues de la documentation publique.
 """
 
 from __future__ import annotations
@@ -73,7 +75,7 @@ _QSS = Template(
     QWidget {
         background: $background;
         color: $text;
-        font-family: "Arial", "Helvetica Neue", "Liberation Sans", sans-serif;
+        font-family: "Marianne", "Arial", "Helvetica Neue", "Liberation Sans", sans-serif;
         font-size: 16px;
     }
     QMainWindow, QScrollArea, QScrollArea > QWidget > QWidget {
@@ -162,7 +164,6 @@ _QSS = Template(
         background: transparent; border: 0; padding: 0;
         color: $text_muted; min-height: 0;
     }
-    QComboBox::drop-down { border: 0; width: 32px; }
     QComboBox QAbstractItemView {
         background: $surface; color: $text; border: 1px solid $border;
         selection-background-color: $primary; selection-color: $on_primary;

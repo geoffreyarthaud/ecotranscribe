@@ -16,6 +16,11 @@
   d'édition lite dans l'interface.
 - La clé mémorisée n'est plus préremplie ; les réglages non secrets sont
   conservés à la fermeture ; `ui/log_visible` est supprimé.
+- Bouton Options remplacé par une icône de roue dentée dans l'en-tête ;
+  doublon « Options » retiré de l'accueil.
+- Liste des modèles à nouveau visible avec sa flèche de sélection.
+- Police Marianne utilisée lorsqu'elle est installée, sans embarquement ;
+  repli Arial sinon.
 
 ## Non publié — 2026-11-06
 

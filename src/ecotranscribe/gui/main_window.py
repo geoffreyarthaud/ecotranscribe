@@ -7,7 +7,7 @@ import os
 from collections.abc import Callable
 from pathlib import Path
 
-from PySide6.QtCore import QThread, QUrl, Qt
+from PySide6.QtCore import QSize, QThread, QUrl, Qt
 from PySide6.QtGui import (
     QCloseEvent,
     QDesktopServices,
@@ -63,6 +63,7 @@ from .pages.settings import SettingsPage
 from .pricing import PricingClient
 from .settings import AppSettings, KeyStore
 from .state import KeySource, PageId, WizardState
+from .widgets.icons import gear_icon
 from .widgets.stepper import Stepper
 from .worker import TranscribeWorker
 
@@ -153,8 +154,11 @@ class MainWindow(QMainWindow):
         title = QLabel("EcoTranscribe Desktop")
         title.setProperty("role", "sectionTitle")
         self.gear_button = QToolButton()
-        self.gear_button.setText("Options")
+        self.gear_button.setIcon(gear_icon())
+        self.gear_button.setIconSize(QSize(22, 22))
         self.gear_button.setToolTip("Options")
+        self.gear_button.setAccessibleName("Options")
+        self.gear_button.setFixedSize(40, 40)
         self.gear_button.setProperty("variant", "tertiary")
         header_layout.addWidget(title)
         header_layout.addStretch(1)
