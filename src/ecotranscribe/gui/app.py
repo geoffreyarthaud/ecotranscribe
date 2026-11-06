@@ -16,6 +16,7 @@ from ecotranscribe.gui.availability import collect_diagnostic
 from ecotranscribe.gui.dialogs import QtDialogService
 from ecotranscribe.gui.logging_setup import configure_logging
 from ecotranscribe.gui.main_window import MainWindow
+from ecotranscribe.gui.pricing import OpenRouterPricingClient
 from ecotranscribe.gui.settings import AppSettings, KeyringStore
 
 
@@ -70,7 +71,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         settings=AppSettings(QSettings()),
         key_store=KeyringStore(),
         dialogs=QtDialogService(),
+        pricing_client=OpenRouterPricingClient(),
     )
+    app.aboutToQuit.connect(window.save_settings)
     window.show()
     return app.exec()
 

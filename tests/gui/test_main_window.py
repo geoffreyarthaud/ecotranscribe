@@ -7,7 +7,7 @@ from PySide6.QtCore import QSettings
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QFormLayout, QLineEdit
 
-from ecotranscribe.core.config import OPENROUTER_MODEL
+from ecotranscribe.core.config import OPENROUTER_MODEL, OPENROUTER_MODELS
 from ecotranscribe.core.errors import CancelledError, TranscribeError
 from ecotranscribe.core.models import (
     ProgressUpdate,
@@ -16,9 +16,19 @@ from ecotranscribe.core.models import (
     TranscribeResult,
 )
 from ecotranscribe.gui.main_window import MainWindow
+from ecotranscribe.gui.pricing import PricingClient
 from ecotranscribe.gui.settings import AppSettings, MemoryStore
 
 from .conftest import FakeDialogs
+
+
+class FakePricingClient(PricingClient):
+    def __init__(self) -> None:
+        super().__init__()
+        self.fetched: list[str] = []
+
+    def fetch(self, model: str) -> None:
+        self.fetched.append(model)
 
 
 def _window(
@@ -27,12 +37,14 @@ def _window(
     key_store: MemoryStore | None = None,
     dialogs: FakeDialogs | None = None,
     service_factory=None,
+    pricing_client: PricingClient | None = None,
 ) -> MainWindow:
     return MainWindow(
         settings=settings,
         key_store=key_store or MemoryStore(),
         dialogs=dialogs or FakeDialogs(),
         service_factory=service_factory,
+        pricing_client=pricing_client,
     )
 
 
@@ -60,6 +72,81 @@ def test_window_construction_without_network(
     assert window.acceptDrops() is True
     assert window.api_key_edit.echoMode() == QLineEdit.EchoMode.Password
     assert window.api_key_edit.placeholderText() == "OPENROUTER_API_KEY"
+
+
+def test_model_list_contains_small_and_mini(
+    qtbot, app_settings: AppSettings
+) -> None:
+    client = FakePricingClient()
+    window = _window(app_settings, pricing_client=client)
+    qtbot.addWidget(window)
+
+    assert client.fetched == list(OPENROUTER_MODELS)
+    assert window.model_combo.currentData() == OPENROUTER_MODEL
+    assert window.model_combo.findData(OPENROUTER_MODELS[1]) >= 0
+
+
+def test_prices_are_added_without_changing_saved_model(
+    qtbot, app_settings: AppSettings
+) -> None:
+    client = FakePricingClient()
+    window = _window(app_settings, pricing_client=client)
+    qtbot.addWidget(window)
+
+    client.price_ready.emit(OPENROUTER_MODEL, 0.24)
+    client.price_ready.emit(OPENROUTER_MODELS[1], 0.21)
+
+    small = window.model_combo.findData(OPENROUTER_MODEL)
+    mini = window.model_combo.findData(OPENROUTER_MODELS[1])
+    assert window.model_combo.itemText(small) == (
+        f"{OPENROUTER_MODEL} (≈ $0.24/h)"
+    )
+    assert window.model_combo.itemText(mini) == (
+        f"{OPENROUTER_MODELS[1]} (≈ $0.21/h)"
+    )
+    assert window.model_combo.currentText() == (
+        f"{OPENROUTER_MODEL} (≈ $0.24/h)"
+    )
+
+    window.save_settings()
+    assert app_settings.model == OPENROUTER_MODEL
+
+
+def test_missing_price_keeps_plain_model_ids(
+    qtbot, app_settings: AppSettings
+) -> None:
+    client = FakePricingClient()
+    window = _window(app_settings, pricing_client=client)
+    qtbot.addWidget(window)
+
+    small = window.model_combo.findData(OPENROUTER_MODEL)
+    mini = window.model_combo.findData(OPENROUTER_MODELS[1])
+    assert window.model_combo.itemText(small) == OPENROUTER_MODEL
+    assert window.model_combo.itemText(mini) == OPENROUTER_MODELS[1]
+
+
+def test_price_update_does_not_overwrite_custom_model(
+    qtbot, app_settings: AppSettings
+) -> None:
+    client = FakePricingClient()
+    window = _window(app_settings, pricing_client=client)
+    qtbot.addWidget(window)
+
+    window.model_combo.setCurrentText("custom/model")
+    client.price_ready.emit(OPENROUTER_MODEL, 0.24)
+
+    assert window.model_combo.currentText() == "custom/model"
+    assert window._current_model() == "custom/model"
+
+
+def test_saved_mini_model_is_restored(
+    qtbot, app_settings: AppSettings
+) -> None:
+    app_settings.model = OPENROUTER_MODELS[1]
+    window = _window(app_settings)
+    qtbot.addWidget(window)
+
+    assert window.model_combo.currentData() == OPENROUTER_MODELS[1]
 
 
 def test_form_fields_grow_to_window_width(
@@ -164,6 +251,25 @@ def test_settings_are_persisted_and_reloaded(
     assert second.log_view.isVisibleTo(second) is True
 
 
+def test_model_selection_is_saved_on_close(
+    qtbot, tmp_path: Path
+) -> None:
+    path = tmp_path / "settings.ini"
+    settings = AppSettings(QSettings(str(path), QSettings.IniFormat))
+    settings.model = OPENROUTER_MODELS[1]
+    settings.save()
+
+    window = _window(settings)
+    qtbot.addWidget(window)
+    window.model_combo.setCurrentIndex(
+        window.model_combo.findData(OPENROUTER_MODEL)
+    )
+    window.close()
+
+    reloaded = AppSettings(QSettings(str(path), QSettings.IniFormat))
+    assert reloaded.model == OPENROUTER_MODEL
+
+
 def test_key_never_written_to_qsettings(
     qtbot, tmp_path: Path
 ) -> None:
@@ -245,6 +351,7 @@ def _ready_window(
     service: FakeService | None = None,
     dialogs: FakeDialogs | None = None,
     key: str = "sk-test",
+    pricing_client: PricingClient | None = None,
 ) -> tuple[MainWindow, FakeService, FakeDialogs]:
     source = tmp_path / "source.mp3"
     source.write_bytes(b"x")
@@ -255,6 +362,7 @@ def _ready_window(
         key_store=MemoryStore(key),
         dialogs=dialogs,
         service_factory=lambda request: fake,
+        pricing_client=pricing_client,
     )
     qtbot.addWidget(window)
     window.set_input_path(source)
@@ -276,6 +384,21 @@ def test_launch_requires_file(
     window.start_transcription()
     assert created == []
     assert window.source_error.isVisibleTo(window) is True
+
+
+def test_request_uses_model_id_with_price_suffix(
+    qtbot, app_settings: AppSettings, tmp_path: Path
+) -> None:
+    client = FakePricingClient()
+    window, fake, _ = _ready_window(
+        qtbot, app_settings, tmp_path, pricing_client=client
+    )
+
+    client.price_ready.emit(OPENROUTER_MODEL, 0.24)
+    window.start_transcription()
+
+    qtbot.waitUntil(lambda: fake.request is not None, timeout=3000)
+    assert fake.request.model == OPENROUTER_MODEL
 
 
 def test_missing_output_dir_is_inline_error(

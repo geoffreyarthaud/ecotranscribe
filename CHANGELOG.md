@@ -1,5 +1,20 @@
 # Changelog
 
+## Non publié — 2026-11-06
+
+### Ajouté
+
+- Liste des modèles OpenRouter : `mistralai/voxtral-small-transcribe-3-0`
+  (nouveau défaut) et `mistralai/voxtral-mini-transcribe-3-0`.
+- Tarif horaire approximatif par modèle, récupéré de façon asynchrone depuis
+  OpenRouter et affiché entre parenthèses ; aucune indication si le réseau ou
+  l'API échoue.
+
+### Corrigé
+
+- Les réglages (dont le modèle sélectionné) sont enregistrés à la fermeture de
+  la fenêtre et à l'arrêt de l'application, même sans lancer de transcription.
+
 ## 0.2.0 — 2026-11-05
 
 ### Ajouté

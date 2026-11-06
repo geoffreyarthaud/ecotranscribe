@@ -99,7 +99,7 @@ uv run ecotranscribe --model tiny <fichier>   # Whisper, avec l'extra
 |---|---|---|
 | `input` | — | Fichier audio ou vidéo |
 | `--provider` | `whisper` | `whisper` ou `openrouter` |
-| `--model` | `medium` / `mistralai/voxtral-mini-transcribe-3-0` | Modèle du moteur |
+| `--model` | `medium` / `mistralai/voxtral-small-transcribe-3-0` | Modèle du moteur |
 
 Le CLI demande confirmation avant d'écraser un fichier existant. Les sorties
 sont écrites à côté de la source.
@@ -125,6 +125,11 @@ sélectionné par défaut ; Whisper est visible, désactivé, avec la raison
 Réglages persistants : géométrie, dernier dossier, dossier de sortie, modèle,
 langue, formats, mémorisation de la clé, journal et cinq derniers modèles.
 La langue `Auto` omet le champ `language` de la requête OpenRouter.
+
+La liste propose `mistralai/voxtral-small-transcribe-3-0` (défaut) et
+`mistralai/voxtral-mini-transcribe-3-0`. Le tarif horaire approximatif affiché
+entre parenthèses est récupéré de façon asynchrone depuis l'API publique
+OpenRouter ; en cas d'échec réseau, la liste reste utilisable sans tarif.
 
 Diagnostic sans fenêtre :
 

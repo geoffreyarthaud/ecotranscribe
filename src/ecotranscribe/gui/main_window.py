@@ -42,7 +42,7 @@ from PySide6.QtWidgets import (
 from ..core.config import (
     AUDIO_EXTENSIONS,
     KEY_MISSING_MESSAGE,
-    OPENROUTER_MODEL,
+    OPENROUTER_MODELS,
     PROJECT_URL,
     VIDEO_EXTENSIONS,
     WHISPER_LITE_REASON,
@@ -59,10 +59,12 @@ from ..core.models import (
     TranscribeResult,
 )
 from ..core.outputs import existing_outputs, output_paths
+from ..core.pricing import format_hourly_price
 from ..core.prompts import resolve_prompt
 from ..core.service import TranscribeService
 from .availability import build_info
 from .dialogs import DialogService
+from .pricing import PricingClient
 from .settings import AppSettings, KeyStore
 from .worker import TranscribeWorker
 
@@ -98,6 +100,7 @@ class MainWindow(QMainWindow):
         dialogs: DialogService,
         service_factory: Callable[[TranscribeRequest], TranscribeService]
         | None = None,
+        pricing_client: PricingClient | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -105,6 +108,7 @@ class MainWindow(QMainWindow):
         self._key_store = key_store
         self._dialogs = dialogs
         self._service_factory = service_factory or self._default_service
+        self._pricing_client = pricing_client
 
         self._input_path: Path | None = None
         self._prompt_path: Path | None = None
@@ -128,6 +132,7 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._connect_signals()
         self._restore_settings()
+        self._attach_pricing()
         self._update_state()
 
     # ── Construction ───────────────────────────────────────────────────────
@@ -226,7 +231,8 @@ class MainWindow(QMainWindow):
         self.model_combo = QComboBox()
         self.model_combo.setEditable(True)
         self.model_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
-        self.model_combo.addItem(OPENROUTER_MODEL)
+        for model in OPENROUTER_MODELS:
+            self.model_combo.addItem(model, model)
         model_label = QLabel("Modèle :")
         model_label.setBuddy(self.model_combo)
         form.addRow(model_label, self.model_combo)
@@ -433,9 +439,13 @@ class MainWindow(QMainWindow):
             self.restoreGeometry(geometry)
 
         for model in self._settings.recent_models:
-            if self.model_combo.findText(model) < 0:
-                self.model_combo.addItem(model)
-        self.model_combo.setCurrentText(self._settings.model)
+            self._add_model_item(model)
+        saved_model = self._settings.model
+        index = self._model_index(saved_model)
+        if index >= 0:
+            self.model_combo.setCurrentIndex(index)
+        else:
+            self.model_combo.setCurrentText(saved_model)
 
         language = self._settings.language
         data = None if language in ("", "auto") else language
@@ -461,6 +471,51 @@ class MainWindow(QMainWindow):
             key = os.environ.get("OPENROUTER_API_KEY")
         if key:
             self.api_key_edit.setText(key)
+
+    # ── Modèles et tarifs ──────────────────────────────────────────────────
+
+    def _attach_pricing(self) -> None:
+        if self._pricing_client is None:
+            return
+        if self._pricing_client.parent() is None:
+            self._pricing_client.setParent(self)
+        self._pricing_client.price_ready.connect(self._on_price_ready)
+        for model in OPENROUTER_MODELS:
+            self._pricing_client.fetch(model)
+
+    def _on_price_ready(self, model: str, price: float) -> None:
+        index = self._model_index(model)
+        if index < 0:
+            return
+        old_text = self.model_combo.itemText(index)
+        current_index = self.model_combo.currentIndex()
+        current_text = self.model_combo.currentText()
+        display = f"{model} ({format_hourly_price(price)})"
+        self.model_combo.setItemText(index, display)
+        if current_index == index and current_text != old_text:
+            self.model_combo.setEditText(current_text)
+
+    def _add_model_item(self, model: str) -> None:
+        model = model.strip()
+        if model and self._model_index(model) < 0:
+            self.model_combo.addItem(model, model)
+
+    def _model_index(self, model: str) -> int:
+        wanted = model.strip()
+        for index in range(self.model_combo.count()):
+            if self.model_combo.itemData(index) == wanted:
+                return index
+        return -1
+
+    def _current_model(self) -> str:
+        index = self.model_combo.currentIndex()
+        if index >= 0:
+            current = self.model_combo.currentText().strip()
+            if current == self.model_combo.itemText(index).strip():
+                data = self.model_combo.itemData(index)
+                if isinstance(data, str) and data:
+                    return data
+        return self.model_combo.currentText().strip()
 
     # ── État et validation ─────────────────────────────────────────────────
 
@@ -566,7 +621,7 @@ class MainWindow(QMainWindow):
             )
             valid = False
 
-        model = self.model_combo.currentText().strip()
+        model = self._current_model()
         if not model:
             self._set_error(self.model_error, "Choisissez un modèle.")
             valid = False
@@ -776,8 +831,7 @@ class MainWindow(QMainWindow):
                 )
 
         self._settings.add_recent_model(model)
-        if self.model_combo.findText(model) < 0:
-            self.model_combo.addItem(model)
+        self._add_model_item(model)
         self.save_settings()
 
         request = TranscribeRequest(
@@ -1008,6 +1062,7 @@ class MainWindow(QMainWindow):
             self.cancel_transcription()
             event.ignore()
             return
+        self.save_settings()
         super().closeEvent(event)
 
     def _open_output_folder(self) -> None:
@@ -1044,7 +1099,7 @@ class MainWindow(QMainWindow):
             if self._output_dir_user_set
             else ""
         )
-        self._settings.model = self.model_combo.currentText().strip()
+        self._settings.model = self._current_model()
         language = self.language_combo.currentData()
         self._settings.language = language or ""
         self._settings.formats = {

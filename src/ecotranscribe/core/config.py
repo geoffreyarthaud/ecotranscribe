@@ -14,8 +14,13 @@ WHISPER_OPTIONS: dict = {
     "compression_ratio_threshold": 2.8,
 }
 
-OPENROUTER_MODEL = "mistralai/voxtral-mini-transcribe-3-0"
+OPENROUTER_MODEL = "mistralai/voxtral-small-transcribe-3-0"
+OPENROUTER_MODELS: tuple[str, ...] = (
+    OPENROUTER_MODEL,
+    "mistralai/voxtral-mini-transcribe-3-0",
+)
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/audio/transcriptions"
+OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 OPENROUTER_CHUNK_SECONDS = 20 * 60
 OPENROUTER_AUDIO_BITRATE = "64k"
 OPENROUTER_REQUEST_TIMEOUT = 90
