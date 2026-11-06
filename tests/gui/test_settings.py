@@ -7,12 +7,7 @@ from PySide6.QtCore import QSettings
 
 from ecotranscribe.core.config import OPENROUTER_MODEL
 from ecotranscribe.gui import logging_setup, settings as settings_module
-from ecotranscribe.gui.settings import (
-    AppSettings,
-    EnvStore,
-    KeyringStore,
-    MemoryStore,
-)
+from ecotranscribe.gui.settings import AppSettings, KeyringStore, MemoryStore
 
 
 def _settings(tmp_path: Path) -> AppSettings:
@@ -27,7 +22,6 @@ def test_defaults(tmp_path: Path) -> None:
     assert app.language == "fr"
     assert app.formats == {"srt", "txt"}
     assert app.remember_api_key is True
-    assert app.log_visible is False
     assert app.output_dir == ""
     assert app.recent_models == []
 
@@ -38,7 +32,6 @@ def test_round_trip(tmp_path: Path) -> None:
     app.language = "en"
     app.formats = {"txt"}
     app.remember_api_key = False
-    app.log_visible = True
     app.output_dir = str(tmp_path / "out")
     app.last_input_dir = str(tmp_path)
     app.add_recent_model("a")
@@ -49,7 +42,6 @@ def test_round_trip(tmp_path: Path) -> None:
     assert reloaded.language == "en"
     assert reloaded.formats == {"txt"}
     assert reloaded.remember_api_key is False
-    assert reloaded.log_visible is True
     assert reloaded.output_dir == str(tmp_path / "out")
     assert reloaded.last_input_dir == str(tmp_path)
     assert reloaded.recent_models == ["a"]
@@ -73,13 +65,6 @@ def test_memory_store() -> None:
     assert store.get() is None
 
 
-def test_env_store(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("OPENROUTER_API_KEY", "from-env")
-    assert EnvStore().get() == "from-env"
-    monkeypatch.delenv("OPENROUTER_API_KEY")
-    assert EnvStore().get() is None
-
-
 class FakeKeyring:
     def __init__(self, *, fail: bool = False, stored: str | None = None) -> None:
         self.fail = fail
@@ -101,14 +86,14 @@ class FakeKeyring:
         self.delete_calls.append((service, user))
 
 
-def test_keyring_store_falls_back_to_env_on_error(
+def test_keyring_store_reports_backend_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("OPENROUTER_API_KEY", "env-key")
     monkeypatch.setattr(
         settings_module, "_keyring_module", lambda: FakeKeyring(fail=True)
     )
-    assert KeyringStore().get() == "env-key"
+    with pytest.raises(RuntimeError):
+        KeyringStore().get()
 
 
 def test_keyring_store_reads_keyring_first(
@@ -131,9 +116,8 @@ def test_keyring_error_does_not_log_secret(
     monkeypatch.setattr(
         settings_module, "_keyring_module", lambda: FakeKeyring(fail=True)
     )
-    with caplog.at_level(logging.WARNING, logger="ecotranscribe"):
+    with pytest.raises(RuntimeError):
         KeyringStore().get()
-    assert "trousseau" in caplog.text.lower()
     assert "sk-or" not in caplog.text
 
 

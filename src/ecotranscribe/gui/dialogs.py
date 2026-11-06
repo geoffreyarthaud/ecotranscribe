@@ -1,4 +1,4 @@
-"""Dialogues injectables, isolés du worker et du cœur."""
+"""Dialogues injectables de confirmation, isolés du worker et du cœur."""
 
 from __future__ import annotations
 
@@ -12,13 +12,11 @@ from PySide6.QtWidgets import QMessageBox, QWidget
 class DialogService(Protocol):
     def confirm_overwrite(self, paths: Sequence[Path]) -> bool: ...
 
-    def show_error(
-        self, title: str, message: str, detail: str
-    ) -> None: ...
-
-    def show_info(self, title: str, message: str) -> None: ...
-
     def confirm_close_while_running(self) -> bool: ...
+
+    def confirm_delete_key(self) -> bool: ...
+
+    def confirm_discard(self, message: str) -> bool: ...
 
 
 class QtDialogService:
@@ -35,38 +33,39 @@ class QtDialogService:
         box.setWindowTitle("Fichiers existants")
         box.setText("Ces fichiers existent déjà :")
         box.setInformativeText("\n".join(str(path) for path in paths))
-        overwrite = box.addButton(
-            "Écraser", QMessageBox.ButtonRole.AcceptRole
-        )
-        cancel = box.addButton(
-            "Annuler", QMessageBox.ButtonRole.RejectRole
-        )
+        overwrite = box.addButton("Écraser", QMessageBox.ButtonRole.AcceptRole)
+        cancel = box.addButton("Annuler", QMessageBox.ButtonRole.RejectRole)
         box.setDefaultButton(cancel)  # type: ignore[arg-type]
         box.exec()
         return box.clickedButton() is overwrite
-
-    def show_error(self, title: str, message: str, detail: str) -> None:
-        box = QMessageBox(self._parent)
-        box.setIcon(QMessageBox.Icon.Critical)
-        box.setWindowTitle(title)
-        box.setText(message)
-        box.setDetailedText(detail)
-        box.exec()
-
-    def show_info(self, title: str, message: str) -> None:
-        box = QMessageBox(self._parent)
-        box.setIcon(QMessageBox.Icon.Information)
-        box.setWindowTitle(title)
-        box.setText(message)
-        box.exec()
 
     def confirm_close_while_running(self) -> bool:
         answer = QMessageBox.question(
             self._parent,
             "Transcription en cours",
-            "Une transcription est en cours. L'annuler et quitter ?",
-            QMessageBox.StandardButton.Yes
-            | QMessageBox.StandardButton.No,
+            "Une transcription est en cours. L'annuler et quitter ? "
+            "L'arrêt peut attendre la fin de la requête en cours.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        return answer == QMessageBox.StandardButton.Yes
+
+    def confirm_delete_key(self) -> bool:
+        answer = QMessageBox.question(
+            self._parent,
+            "Supprimer la clé",
+            "Supprimer la clé OpenRouter mémorisée ?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        return answer == QMessageBox.StandardButton.Yes
+
+    def confirm_discard(self, message: str) -> bool:
+        answer = QMessageBox.question(
+            self._parent,
+            "Abandonner les modifications",
+            message,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
         return answer == QMessageBox.StandardButton.Yes

@@ -104,14 +104,6 @@ class AppSettings:
         self._settings.setValue("api_key/remember", value)
 
     @property
-    def log_visible(self) -> bool:
-        return bool(self._settings.value("ui/log_visible", False, type=bool))
-
-    @log_visible.setter
-    def log_visible(self, value: bool) -> None:
-        self._settings.setValue("ui/log_visible", value)
-
-    @property
     def recent_models(self) -> list[str]:
         return _string_list(
             self._settings.value("models/recent", [])
@@ -150,24 +142,13 @@ def _keyring_module():
 
 
 class KeyringStore:
-    """Trousseau système, avec fallback non bloquant sur l'environnement."""
+    """Trousseau système ; l'appelant gère le fallback environnement."""
 
     service = "ecotranscribe"
     user = "openrouter"
 
     def get(self) -> str | None:
-        try:
-            key = _keyring_module().get_password(self.service, self.user)
-        except Exception as exc:  # backend absent/verrouillé
-            logger.warning(
-                "Trousseau indisponible, utilisation de "
-                "OPENROUTER_API_KEY : %s",
-                exc,
-            )
-        else:
-            if key:
-                return key
-        return os.environ.get("OPENROUTER_API_KEY")
+        return _keyring_module().get_password(self.service, self.user)
 
     def set(self, key: str) -> None:
         _keyring_module().set_password(self.service, self.user, key)
@@ -199,17 +180,4 @@ class MemoryStore:
         self._key = None
 
 
-class EnvStore:
-    """Store en lecture prioritaire de l'environnement, pour le fallback."""
 
-    def __init__(self) -> None:
-        self._override: str | None = None
-
-    def get(self) -> str | None:
-        return self._override or os.environ.get("OPENROUTER_API_KEY")
-
-    def set(self, key: str) -> None:
-        self._override = key
-
-    def delete(self) -> None:
-        self._override = None

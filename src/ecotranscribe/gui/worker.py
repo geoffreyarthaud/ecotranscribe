@@ -13,7 +13,7 @@ class TranscribeWorker(QObject):
     progress = Signal(object)
     log = Signal(str)
     finished = Signal(object)
-    failed = Signal(str, str)
+    failed = Signal(object)
     cancelled = Signal()
 
     def __init__(
@@ -40,10 +40,10 @@ class TranscribeWorker(QObject):
         except CancelledError:
             self.cancelled.emit()
         except TranscribeError as exc:
-            self.failed.emit(exc.user_message, exc.detail or "")
+            self.failed.emit(exc)
         except Exception as exc:  # garde-fou UI
             self.failed.emit(
-                "La transcription a échoué.", str(exc)
+                TranscribeError("La transcription a échoué.", detail=str(exc))
             )
         else:
             self.finished.emit(result)

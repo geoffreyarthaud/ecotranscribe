@@ -1,14 +1,13 @@
-"""Fenêtre principale EcoTranscribe Desktop (édition lite)."""
+"""Fenêtre principale : shell et contrôleur de l'assistant."""
 
 from __future__ import annotations
 
 import logging
 import os
-import time
 from collections.abc import Callable
 from pathlib import Path
 
-from PySide6.QtCore import QThread, QTimer, QUrl, Qt
+from PySide6.QtCore import QThread, QUrl, Qt
 from PySide6.QtGui import (
     QCloseEvent,
     QDesktopServices,
@@ -18,22 +17,11 @@ from PySide6.QtGui import (
     QShortcut,
 )
 from PySide6.QtWidgets import (
-    QCheckBox,
-    QComboBox,
-    QDialog,
-    QDialogButtonBox,
     QFileDialog,
-    QFormLayout,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QMainWindow,
-    QPlainTextEdit,
-    QProgressBar,
-    QPushButton,
-    QRadioButton,
-    QScrollArea,
+    QStackedWidget,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -43,52 +31,52 @@ from ..core.config import (
     AUDIO_EXTENSIONS,
     KEY_MISSING_MESSAGE,
     OPENROUTER_MODELS,
-    PROJECT_URL,
     VIDEO_EXTENSIONS,
-    WHISPER_LITE_REASON,
 )
 from ..core.engines.openrouter import OpenRouterEngine
-from ..core.errors import InvalidRequestError
-from ..core.formatting import format_seconds
+from ..core.errors import (
+    EngineUnavailableError,
+    InvalidRequestError,
+    TranscribeError,
+)
 from ..core.models import (
     CancelToken,
     OutputFormat,
     ProgressUpdate,
     Provider,
     TranscribeRequest,
-    TranscribeResult,
 )
 from ..core.outputs import existing_outputs, output_paths
-from ..core.pricing import format_hourly_price
 from ..core.prompts import resolve_prompt
 from ..core.service import TranscribeService
 from .availability import build_info
 from .dialogs import DialogService
+from .duration import DurationProbe
+from .logging_setup import log_file_path
+from .pages.done import DonePage
+from .pages.home import HomePage
+from .pages.key import KeyMode, KeyPage
+from .pages.options import OptionsPage
+from .pages.progress import ProgressPage
+from .pages.prompt import PromptPage
+from .pages.settings import SettingsPage
 from .pricing import PricingClient
 from .settings import AppSettings, KeyStore
+from .state import KeySource, PageId, WizardState
+from .widgets.stepper import Stepper
 from .worker import TranscribeWorker
 
 logger = logging.getLogger("ecotranscribe")
 
-_LANGUAGES = (
-    ("Français", "fr"),
-    ("Auto", None),
-    ("Anglais", "en"),
-    ("Espagnol", "es"),
-    ("Allemand", "de"),
-    ("Italien", "it"),
-    ("Portugais", "pt"),
-    ("Néerlandais", "nl"),
-)
-
-_PHASE_LABELS = {
-    "validating": "Validation",
-    "extracting": "Extraction audio",
-    "detecting_silences": "Détection des silences",
-    "transcribing": "Transcription",
-    "writing": "Écriture des fichiers",
-    "done": "Terminé",
+_STAGE_BY_PAGE = {
+    PageId.HOME: 0,
+    PageId.KEY: 0,
+    PageId.PROMPT: 1,
+    PageId.SETTINGS: 2,
+    PageId.PROGRESS: 3,
 }
+_STEPPER_PAGES = {PageId.KEY, PageId.PROMPT, PageId.SETTINGS, PageId.PROGRESS}
+_GEAR_PAGES = {PageId.HOME, PageId.PROMPT, PageId.SETTINGS, PageId.PROGRESS}
 
 
 class MainWindow(QMainWindow):
@@ -101,6 +89,7 @@ class MainWindow(QMainWindow):
         service_factory: Callable[[TranscribeRequest], TranscribeService]
         | None = None,
         pricing_client: PricingClient | None = None,
+        duration_probe: DurationProbe | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -109,31 +98,41 @@ class MainWindow(QMainWindow):
         self._dialogs = dialogs
         self._service_factory = service_factory or self._default_service
         self._pricing_client = pricing_client
-
-        self._input_path: Path | None = None
-        self._prompt_path: Path | None = None
-        self._prompt_text: str | None = None
-        self._output_dir_user_set = False
-        self._output_folder: Path | None = None
-
-        self._cancel_token: CancelToken | None = None
-        self._worker: TranscribeWorker | None = None
+        self._duration_probe = duration_probe or DurationProbe(parent=self)
+        self._state = WizardState()
+        self._history: list[PageId] = []
+        self._current = PageId.HOME
         self._thread: QThread | None = None
-        self._running = False
-        self._writing = False
+        self._worker: TranscribeWorker | None = None
+        self._cancel_token: CancelToken | None = None
         self._close_when_done = False
-        self._task_started = 0.0
-        self._last_progress: ProgressUpdate | None = None
-
-        self._elapsed_timer = QTimer(self)
-        self._elapsed_timer.setInterval(1000)
-        self._elapsed_timer.timeout.connect(self._update_elapsed)
-
+        self._pending_new = False
+        self._busy = False
+        self._writing = False
+        self._settings_loaded = False
+        self._pricing_attached = False
+        self._keyring_available = True
+        self._keyring_key: str | None = None
+        self._env_key: str | None = None
+        self._active_key: str | None = None
+        self._restore_state()
+        self._load_keys()
         self._build_ui()
         self._connect_signals()
-        self._restore_settings()
-        self._attach_pricing()
-        self._update_state()
+        self._refresh_key_source()
+        self._show_page(PageId.HOME, push=False)
+
+    @property
+    def state(self) -> WizardState:
+        return self._state
+
+    @property
+    def current_page(self) -> PageId:
+        return self._current
+
+    @property
+    def is_busy(self) -> bool:
+        return self._busy or self._thread is not None
 
     # ── Construction ───────────────────────────────────────────────────────
 
@@ -143,716 +142,558 @@ class MainWindow(QMainWindow):
         self.resize(900, 820)
         self.setAcceptDrops(True)
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        content = QWidget()
-        scroll.setWidget(content)
-        self.setCentralWidget(scroll)
+        central = QWidget()
+        root = QVBoxLayout(central)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
 
-        layout = QVBoxLayout(content)
-        layout.setContentsMargins(18, 16, 18, 16)
-        layout.setSpacing(10)
-
-        # En-tête
-        header = QHBoxLayout()
+        header = QWidget()
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(32, 16, 32, 16)
         title = QLabel("EcoTranscribe Desktop")
-        title.setStyleSheet("font-size: 22px; font-weight: 600;")
-        badge = QLabel("Édition lite — OpenRouter")
-        badge.setStyleSheet(
-            "background: #ccfbf1; color: #134e4a; border-radius: 6px; "
-            "padding: 4px 8px;"
+        title.setProperty("role", "sectionTitle")
+        self.gear_button = QToolButton()
+        self.gear_button.setText("Options")
+        self.gear_button.setToolTip("Options")
+        self.gear_button.setProperty("variant", "tertiary")
+        header_layout.addWidget(title)
+        header_layout.addStretch(1)
+        header_layout.addWidget(self.gear_button)
+        root.addWidget(header)
+
+        self._stepper_wrap = QWidget()
+        stepper_layout = QHBoxLayout(self._stepper_wrap)
+        stepper_layout.setContentsMargins(32, 8, 32, 8)
+        self.stepper = Stepper()
+        stepper_layout.addWidget(self.stepper)
+        root.addWidget(self._stepper_wrap)
+
+        self.stack = QStackedWidget()
+        root.addWidget(self.stack, 1)
+
+        self.home_page = HomePage()
+        self.key_page = KeyPage()
+        self.prompt_page = PromptPage()
+        self.settings_page = SettingsPage()
+        self.progress_page = ProgressPage()
+        self.done_page = DonePage()
+        self.options_page = OptionsPage()
+        self._pages = {
+            PageId.HOME: self.home_page,
+            PageId.KEY: self.key_page,
+            PageId.PROMPT: self.prompt_page,
+            PageId.SETTINGS: self.settings_page,
+            PageId.PROGRESS: self.progress_page,
+            PageId.DONE: self.done_page,
+            PageId.OPTIONS: self.options_page,
+        }
+        for page in self._pages.values():
+            self.stack.addWidget(page)
+        self.setCentralWidget(central)
+        self.key_page.key_form.remember.setChecked(
+            self._settings.remember_api_key
         )
-        self.about_button = QPushButton("À propos")
-        header.addWidget(title)
-        header.addWidget(badge)
-        header.addStretch(1)
-        header.addWidget(self.about_button)
-        layout.addLayout(header)
-
-        # Source
-        source_group = QGroupBox("Source")
-        source_layout = QVBoxLayout(source_group)
-        source_row = QHBoxLayout()
-        source_label = QLabel("Fichier :")
-        self.input_edit = QLineEdit()
-        self.input_edit.setPlaceholderText(
-            "Chemin du fichier audio ou vidéo"
+        self.options_page.key_form.remember.setChecked(
+            self._settings.remember_api_key
         )
-        source_label.setBuddy(self.input_edit)
-        self.browse_button = QPushButton("Parcourir…")
-        source_row.addWidget(source_label)
-        source_row.addWidget(self.input_edit, 1)
-        source_row.addWidget(self.browse_button)
-        self.drop_hint = QLabel(
-            "Glissez-déposez un fichier audio ou vidéo dans la fenêtre"
-        )
-        self.drop_hint.setStyleSheet("color: #6b7280; font-style: italic;")
-        self.source_error = self._new_error_label()
-        source_layout.addLayout(source_row)
-        source_layout.addWidget(self.drop_hint)
-        source_layout.addWidget(self.source_error)
-        layout.addWidget(source_group)
-
-        # Fournisseur
-        provider_group = QGroupBox("Fournisseur")
-        provider_layout = QVBoxLayout(provider_group)
-        provider_row = QHBoxLayout()
-        self.provider_openrouter = QRadioButton("OpenRouter (cloud)")
-        self.provider_openrouter.setChecked(True)
-        self.provider_whisper = QRadioButton("Whisper local")
-        self.provider_whisper.setEnabled(False)
-        provider_row.addWidget(self.provider_openrouter)
-        provider_row.addWidget(self.provider_whisper)
-        provider_row.addStretch(1)
-        self.whisper_reason = QLabel(
-            f"{WHISPER_LITE_REASON} "
-            f"<a href=\"{PROJECT_URL}\">Édition full</a>"
-        )
-        self.whisper_reason.setOpenExternalLinks(True)
-        self.cloud_warning = QLabel(
-            "L'audio est envoyé à OpenRouter ; le prompt l'est si le "
-            "modèle le supporte."
-        )
-        self.cloud_warning.setWordWrap(True)
-        self.cloud_warning.setStyleSheet("color: #92400e;")
-        provider_layout.addLayout(provider_row)
-        provider_layout.addWidget(self.whisper_reason)
-        provider_layout.addWidget(self.cloud_warning)
-        layout.addWidget(provider_group)
-
-        # Réglages
-        form = QFormLayout()
-        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
-        form.setFieldGrowthPolicy(
-            QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
-        )
-        self.form_layout = form
-
-        self.model_combo = QComboBox()
-        self.model_combo.setEditable(True)
-        self.model_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
-        for model in OPENROUTER_MODELS:
-            self.model_combo.addItem(model, model)
-        model_label = QLabel("Modèle :")
-        model_label.setBuddy(self.model_combo)
-        form.addRow(model_label, self.model_combo)
-        self.model_error = self._new_error_label()
-        form.addRow("", self.model_error)
-
-        self.language_combo = QComboBox()
-        for label, code in _LANGUAGES:
-            self.language_combo.addItem(label, code)
-        language_label = QLabel("Langue :")
-        language_label.setBuddy(self.language_combo)
-        form.addRow(language_label, self.language_combo)
-
-        prompt_widget = QWidget()
-        prompt_layout = QVBoxLayout(prompt_widget)
-        prompt_layout.setContentsMargins(0, 0, 0, 0)
-        prompt_buttons = QHBoxLayout()
-        self.prompt_path_label = QLabel("Aucun prompt détecté")
-        self.prompt_path_label.setWordWrap(True)
-        self.edit_prompt_button = QPushButton("Éditer…")
-        self.clear_prompt_button = QPushButton("Effacer")
-        prompt_buttons.addWidget(self.prompt_path_label, 1)
-        prompt_buttons.addWidget(self.edit_prompt_button)
-        prompt_buttons.addWidget(self.clear_prompt_button)
-        self.prompt_preview = QLabel("")
-        self.prompt_preview.setWordWrap(True)
-        self.prompt_preview.setStyleSheet("color: #4b5563;")
-        self.prompt_error = self._new_error_label()
-        prompt_layout.addLayout(prompt_buttons)
-        prompt_layout.addWidget(self.prompt_preview)
-        prompt_layout.addWidget(self.prompt_error)
-        prompt_label = QLabel("Prompt :")
-        prompt_label.setBuddy(self.edit_prompt_button)
-        form.addRow(prompt_label, prompt_widget)
-
-        output_widget = QWidget()
-        output_layout = QVBoxLayout(output_widget)
-        output_layout.setContentsMargins(0, 0, 0, 0)
-        output_row = QHBoxLayout()
-        self.output_edit = QLineEdit()
-        self.output_edit.setPlaceholderText(
-            "Dossier de sortie (défaut : dossier de la source)"
-        )
-        self.output_browse_button = QPushButton("Parcourir…")
-        output_row.addWidget(self.output_edit, 1)
-        output_row.addWidget(self.output_browse_button)
-        formats_row = QHBoxLayout()
-        self.srt_checkbox = QCheckBox("SRT")
-        self.txt_checkbox = QCheckBox("TXT")
-        self.srt_checkbox.setChecked(True)
-        self.txt_checkbox.setChecked(True)
-        formats_row.addWidget(self.srt_checkbox)
-        formats_row.addWidget(self.txt_checkbox)
-        formats_row.addStretch(1)
-        self.output_error = self._new_error_label()
-        self.formats_error = self._new_error_label()
-        output_layout.addLayout(output_row)
-        output_layout.addLayout(formats_row)
-        output_layout.addWidget(self.output_error)
-        output_layout.addWidget(self.formats_error)
-        output_label = QLabel("Sortie :")
-        output_label.setBuddy(self.output_edit)
-        form.addRow(output_label, output_widget)
-
-        key_widget = QWidget()
-        key_layout = QVBoxLayout(key_widget)
-        key_layout.setContentsMargins(0, 0, 0, 0)
-        key_row = QHBoxLayout()
-        self.api_key_edit = QLineEdit()
-        self.api_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        self.api_key_edit.setPlaceholderText("OPENROUTER_API_KEY")
-        self.remember_checkbox = QCheckBox("Mémoriser")
-        self.remember_checkbox.setChecked(True)
-        self.delete_key_button = QPushButton("Supprimer")
-        key_row.addWidget(self.api_key_edit, 1)
-        key_row.addWidget(self.remember_checkbox)
-        key_row.addWidget(self.delete_key_button)
-        self.api_error = self._new_error_label()
-        key_layout.addLayout(key_row)
-        key_layout.addWidget(self.api_error)
-        key_label = QLabel("Clé API :")
-        key_label.setBuddy(self.api_key_edit)
-        form.addRow(key_label, key_widget)
-
-        layout.addLayout(form)
-
-        # Actions et progression
-        action_group = QGroupBox("Transcription")
-        action_layout = QVBoxLayout(action_group)
-        action_row = QHBoxLayout()
-        self.launch_button = QPushButton("Lancer")
-        self.cancel_button = QPushButton("Annuler")
-        self.cancel_button.setEnabled(False)
-        action_row.addWidget(self.launch_button)
-        action_row.addWidget(self.cancel_button)
-        action_row.addStretch(1)
-        action_layout.addLayout(action_row)
-
-        self.phase_label = QLabel("Choisissez un fichier")
-        self.phase_label.setWordWrap(True)
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setTextVisible(True)
-        self.elapsed_label = QLabel("")
-        self.elapsed_label.setStyleSheet("color: #4b5563;")
-        self.log_toggle = QToolButton()
-        self.log_toggle.setText("Journal")
-        self.log_toggle.setCheckable(True)
-        self.log_view = QPlainTextEdit()
-        self.log_view.setReadOnly(True)
-        self.log_view.setMaximumBlockCount(5000)
-        self.log_view.setMinimumHeight(120)
-        self.log_view.setVisible(False)
-        action_layout.addWidget(self.phase_label)
-        action_layout.addWidget(self.progress_bar)
-        action_layout.addWidget(self.elapsed_label)
-        action_layout.addWidget(self.log_toggle)
-        action_layout.addWidget(self.log_view)
-        layout.addWidget(action_group)
-
-        # Résultat
-        result_group = QGroupBox("Résultat")
-        result_layout = QVBoxLayout(result_group)
-        self.status_label = QLabel("Choisissez un fichier")
-        self.result_paths_label = QLabel("")
-        self.result_paths_label.setWordWrap(True)
-        self.result_paths_label.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse
-        )
-        self.cost_label = QLabel("")
-        self.open_folder_button = QPushButton("Ouvrir le dossier")
-        self.open_folder_button.setEnabled(False)
-        result_layout.addWidget(self.status_label)
-        result_layout.addWidget(self.result_paths_label)
-        result_layout.addWidget(self.cost_label)
-        result_layout.addWidget(self.open_folder_button)
-        layout.addWidget(result_group)
-        layout.addStretch(1)
-
-        self._editable_widgets = [
-            self.input_edit,
-            self.browse_button,
-            self.provider_openrouter,
-            self.model_combo,
-            self.language_combo,
-            self.edit_prompt_button,
-            self.clear_prompt_button,
-            self.output_edit,
-            self.output_browse_button,
-            self.srt_checkbox,
-            self.txt_checkbox,
-            self.api_key_edit,
-            self.remember_checkbox,
-            self.delete_key_button,
-        ]
-
-    def _new_error_label(self) -> QLabel:
-        label = QLabel("")
-        label.setWordWrap(True)
-        label.setStyleSheet("color: #b91c1c;")
-        label.setVisible(False)
-        return label
 
     def _connect_signals(self) -> None:
-        self.browse_button.clicked.connect(self._browse_file)
-        self.input_edit.returnPressed.connect(self._on_input_edited)
-        self.output_browse_button.clicked.connect(self._browse_output)
-        self.output_edit.textEdited.connect(self._on_output_edited)
-        self.edit_prompt_button.clicked.connect(self._edit_prompt)
-        self.clear_prompt_button.clicked.connect(self._clear_prompt)
-        self.srt_checkbox.toggled.connect(self._on_format_changed)
-        self.txt_checkbox.toggled.connect(self._on_format_changed)
-        self.delete_key_button.clicked.connect(self._delete_key)
-        self.launch_button.clicked.connect(self.start_transcription)
-        self.cancel_button.clicked.connect(self.cancel_transcription)
-        self.log_toggle.toggled.connect(self._on_log_toggle)
-        self.open_folder_button.clicked.connect(self._open_output_folder)
-        self.about_button.clicked.connect(self.show_about)
+        self.gear_button.clicked.connect(self._open_options)
+        self.home_page.browse_requested.connect(self._browse_file)
+        self.home_page.continue_requested.connect(self._continue_from_home)
+        self.home_page.change_file_requested.connect(self._change_file)
+        self.home_page.options_requested.connect(self._open_options)
+        self.key_page.submitted.connect(self._on_key_submitted)
+        self.key_page.back_requested.connect(self._on_key_back)
+        self.prompt_page.next_requested.connect(self._on_prompt_next)
+        self.prompt_page.back_requested.connect(self._back)
+        self.prompt_page.change_file_requested.connect(self._change_file)
+        self.settings_page.launch_requested.connect(self._launch)
+        self.settings_page.back_requested.connect(self._back)
+        self.settings_page.browse_output_requested.connect(self._browse_output)
+        self.settings_page.use_source_requested.connect(self._use_source_dir)
+        self.progress_page.cancel_requested.connect(self.cancel_transcription)
+        self.progress_page.back_to_settings_requested.connect(self._back_to_settings)
+        self.progress_page.home_requested.connect(self._home_from_progress)
+        self.progress_page.open_log_requested.connect(self._open_log)
+        self.progress_page.open_folder_requested.connect(self._open_output_folder)
+        self.progress_page.edit_key_requested.connect(self._edit_key_after_error)
+        self.progress_page.change_file_requested.connect(self._change_file)
+        self.done_page.open_folder_requested.connect(self._open_output_folder)
+        self.done_page.new_transcription_requested.connect(self._new_transcription)
+        self.options_page.save_key_requested.connect(self._save_options_key)
+        self.options_page.delete_key_requested.connect(self._delete_options_key)
+        self.options_page.back_requested.connect(self._back)
+        self._duration_probe.ready.connect(self._on_duration_ready)
+        self._duration_probe.failed.connect(self._on_duration_failed)
+        self._shortcuts: list[QShortcut] = []
+        self._add_shortcut(QKeySequence.StandardKey.Open, self._browse_file)
+        self._add_shortcut(QKeySequence("Ctrl+Return"), self._primary_shortcut)
+        self._add_shortcut(QKeySequence("Ctrl+Enter"), self._primary_shortcut)
+        self._add_shortcut(QKeySequence("Meta+Return"), self._primary_shortcut)
+        self._add_shortcut(QKeySequence(Qt.Key.Key_Escape), self._escape)
 
-        self._shortcuts = [
-            self._make_shortcut(QKeySequence.StandardKey.Open, self._browse_file),
-            self._make_shortcut(
-                QKeySequence("Ctrl+Return"), self.start_transcription
-            ),
-            self._make_shortcut(
-                QKeySequence("Ctrl+Enter"), self.start_transcription
-            ),
-            self._make_shortcut(
-                QKeySequence(Qt.Key.Key_Escape), self._on_escape
-            ),
-        ]
-
-    def _make_shortcut(
-        self, sequence: QKeySequence | QKeySequence.StandardKey, callback
-    ) -> QShortcut:
+    def _add_shortcut(self, sequence, callback) -> None:
         shortcut = QShortcut(QKeySequence(sequence), self)
         shortcut.activated.connect(callback)
-        return shortcut
-
-    def _restore_settings(self) -> None:
-        geometry = self._settings.geometry
-        if geometry:
-            self.restoreGeometry(geometry)
-
-        for model in self._settings.recent_models:
-            self._add_model_item(model)
-        saved_model = self._settings.model
-        index = self._model_index(saved_model)
-        if index >= 0:
-            self.model_combo.setCurrentIndex(index)
-        else:
-            self.model_combo.setCurrentText(saved_model)
-
-        language = self._settings.language
-        data = None if language in ("", "auto") else language
-        index = self.language_combo.findData(data)
-        if index >= 0:
-            self.language_combo.setCurrentIndex(index)
-
-        formats = self._settings.formats
-        self.srt_checkbox.setChecked("srt" in formats)
-        self.txt_checkbox.setChecked("txt" in formats)
-
-        if self._settings.output_dir:
-            self.output_edit.setText(self._settings.output_dir)
-            self._output_dir_user_set = True
-
-        self.remember_checkbox.setChecked(self._settings.remember_api_key)
-        self.log_toggle.setChecked(self._settings.log_visible)
-
-        try:
-            key = self._key_store.get()
-        except Exception as exc:
-            logger.warning("Lecture du trousseau impossible : %s", exc)
-            key = os.environ.get("OPENROUTER_API_KEY")
-        if key:
-            self.api_key_edit.setText(key)
-
-    # ── Modèles et tarifs ──────────────────────────────────────────────────
+        self._shortcuts.append(shortcut)
 
     def _attach_pricing(self) -> None:
-        if self._pricing_client is None:
+        if self._pricing_client is None or self._pricing_attached:
             return
+        self._pricing_attached = True
         if self._pricing_client.parent() is None:
             self._pricing_client.setParent(self)
-        self._pricing_client.price_ready.connect(self._on_price_ready)
+        self._pricing_client.price_ready.connect(self.settings_page.set_price)
         for model in OPENROUTER_MODELS:
             self._pricing_client.fetch(model)
 
-    def _on_price_ready(self, model: str, price: float) -> None:
-        index = self._model_index(model)
-        if index < 0:
-            return
-        old_text = self.model_combo.itemText(index)
-        current_index = self.model_combo.currentIndex()
-        current_text = self.model_combo.currentText()
-        display = f"{model} ({format_hourly_price(price)})"
-        self.model_combo.setItemText(index, display)
-        if current_index == index and current_text != old_text:
-            self.model_combo.setEditText(current_text)
-
-    def _add_model_item(self, model: str) -> None:
-        model = model.strip()
-        if model and self._model_index(model) < 0:
-            self.model_combo.addItem(model, model)
-
-    def _model_index(self, model: str) -> int:
-        wanted = model.strip()
-        for index in range(self.model_combo.count()):
-            if self.model_combo.itemData(index) == wanted:
-                return index
-        return -1
-
-    def _current_model(self) -> str:
-        index = self.model_combo.currentIndex()
-        if index >= 0:
-            current = self.model_combo.currentText().strip()
-            if current == self.model_combo.itemText(index).strip():
-                data = self.model_combo.itemData(index)
-                if isinstance(data, str) and data:
-                    return data
-        return self.model_combo.currentText().strip()
-
-    # ── État et validation ─────────────────────────────────────────────────
-
-    def _update_state(self) -> None:
-        busy = self._running or self._thread is not None
-        for widget in self._editable_widgets:
-            widget.setEnabled(not busy)
-        self.whisper_reason.setEnabled(True)
-        self.launch_button.setEnabled(
-            self._input_path is not None and not busy
+    def _restore_state(self) -> None:
+        self._state.model = self._settings.model
+        self._state.language = self._settings.language or None
+        self._state.formats = frozenset(
+            OutputFormat(value) for value in self._settings.formats
         )
-        self.cancel_button.setEnabled(self._running and not self._writing)
+        if self._settings.output_dir:
+            self._state.output_dir = Path(self._settings.output_dir)
+            self._state.output_dir_user_set = True
 
-    def _clear_errors(self) -> None:
-        for label in (
-            self.source_error,
-            self.model_error,
-            self.prompt_error,
-            self.output_error,
-            self.formats_error,
-            self.api_error,
-        ):
-            label.clear()
-            label.setVisible(False)
-
-    @staticmethod
-    def _set_error(label: QLabel, message: str) -> None:
-        label.setText(message)
-        label.setVisible(bool(message))
-
-    def _resolve_api_key(self) -> str | None:
-        key = self.api_key_edit.text().strip()
-        if key:
-            return key
+    def _load_keys(self) -> None:
         try:
-            key = self._key_store.get()
+            value = self._key_store.get()
         except Exception as exc:
             logger.warning("Lecture du trousseau impossible : %s", exc)
-            key = os.environ.get("OPENROUTER_API_KEY")
-        return (key or "").strip() or None
+            self._keyring_available = False
+            value = None
+        self._keyring_key = (value or "").strip() or None
+        self._env_key = (
+            os.environ.get("OPENROUTER_API_KEY") or ""
+        ).strip() or None
+        self._refresh_key_source()
 
-    def _validate_form(self):
-        self._clear_errors()
-        valid = True
+    def _refresh_key_source(self) -> None:
+        if self._state.session_key:
+            self._state.key_source = KeySource.SESSION
+            self._active_key = self._state.session_key
+        elif self._keyring_key:
+            self._state.key_source = KeySource.KEYRING
+            self._active_key = self._keyring_key
+        elif self._env_key:
+            self._state.key_source = KeySource.ENV
+            self._active_key = self._env_key
+        else:
+            self._state.key_source = KeySource.NONE
+            self._active_key = None
+        if hasattr(self, "home_page"):
+            self.home_page.set_has_key(self._active_key is not None)
+            self.key_page.set_keyring_available(self._keyring_available)
+            self.key_page.set_status(self._key_status_text())
+            self._update_options_status()
 
-        if self._input_path is None:
-            self._set_error(
-                self.source_error, "Choisissez un fichier audio ou vidéo."
-            )
-            valid = False
-        elif not self._input_path.exists():
-            self._set_error(
-                self.source_error,
-                "Le fichier sélectionné n'existe plus.",
-            )
-            valid = False
-        elif not self._input_path.is_file():
-            self._set_error(
-                self.source_error,
-                "Le fichier sélectionné n'est pas un fichier valide.",
-            )
-            valid = False
-        elif not os.access(self._input_path, os.R_OK):
-            self._set_error(
-                self.source_error,
-                "Impossible de lire ce fichier. Vérifiez les permissions.",
-            )
-            valid = False
+    def _update_options_status(self) -> None:
+        self.options_page.set_status(self._key_status_text())
+        self.options_page.set_keyring_available(self._keyring_available)
+        self.options_page.set_can_delete(self._can_delete_key())
 
-        output_text = self.output_edit.text().strip()
-        output_dir = (
-            Path(output_text).expanduser()
-            if output_text
-            else (
-                self._input_path.parent
-                if self._input_path is not None
-                else Path.cwd()
-            )
+    def _key_status_text(self) -> str:
+        return {
+            KeySource.NONE: "Aucune clé active",
+            KeySource.SESSION: "Clé de session (non enregistrée)",
+            KeySource.KEYRING: "Clé enregistrée dans le trousseau",
+            KeySource.ENV: "Clé fournie par l'environnement",
+        }[self._state.key_source]
+
+    def _can_delete_key(self) -> bool:
+        return self._state.key_source in (
+            KeySource.SESSION,
+            KeySource.KEYRING,
         )
-        if not output_dir.exists():
-            self._set_error(
-                self.output_error, "Le dossier de sortie n'existe pas."
-            )
-            valid = False
-        elif not output_dir.is_dir():
-            self._set_error(
-                self.output_error,
-                "Le dossier de sortie n'est pas un dossier.",
-            )
-            valid = False
-        elif not os.access(output_dir, os.W_OK | os.X_OK):
-            self._set_error(
-                self.output_error,
-                "Le dossier de sortie n'est pas inscriptible.",
-            )
-            valid = False
 
-        formats = self._selected_formats()
-        if not formats:
-            self._set_error(
-                self.formats_error,
-                "Choisissez au moins un format de sortie.",
-            )
-            valid = False
+    # ── Navigation ─────────────────────────────────────────────────────────
 
-        model = self._current_model()
-        if not model:
-            self._set_error(self.model_error, "Choisissez un modèle.")
-            valid = False
+    def _show_page(self, page: PageId, *, push: bool = True) -> None:
+        if push and self._current != page:
+            self._history.append(self._current)
+        self._current = page
+        self.stack.setCurrentWidget(self._pages[page])
+        self._stepper_wrap.setVisible(page in _STEPPER_PAGES)
+        if page in _STAGE_BY_PAGE:
+            self.stepper.set_current(_STAGE_BY_PAGE[page])
+        self._update_gear()
+        self._pages[page].focus_primary()
 
-        api_key = self._resolve_api_key()
-        if not api_key:
-            self._set_error(self.api_error, KEY_MISSING_MESSAGE)
-            valid = False
+    def _update_gear(self) -> None:
+        visible = self._current in _GEAR_PAGES
+        self.gear_button.setVisible(visible)
+        self.gear_button.setEnabled(visible and not self.is_busy)
 
-        if not valid or self._input_path is None:
-            return None
-        return self._input_path, output_dir, formats, model, api_key
+    def _back(self) -> None:
+        if self.is_busy:
+            return
+        if self._current == PageId.PROMPT:
+            self._capture_prompt()
+        if self._current == PageId.SETTINGS:
+            self._capture_settings()
+        if self._current == PageId.OPTIONS and self.options_page.is_dirty():
+            if not self._dialogs.confirm_discard(
+                "La clé saisie n'est pas enregistrée. Quitter ?"
+            ):
+                return
+        self.options_page.mark_clean()
+        if not self._history:
+            return
+        target = self._history.pop()
+        self._show_page(target, push=False)
 
-    def _selected_formats(self) -> frozenset[OutputFormat]:
-        formats = set()
-        if self.srt_checkbox.isChecked():
-            formats.add(OutputFormat.SRT)
-        if self.txt_checkbox.isChecked():
-            formats.add(OutputFormat.TXT)
-        return frozenset(formats)
+    def _rewind_to(self, page: PageId) -> None:
+        if page in self._history:
+            index = len(self._history) - 1 - self._history[::-1].index(page)
+            self._history = self._history[:index]
+        self._show_page(page, push=False)
 
-    # ── Sélection de fichiers ──────────────────────────────────────────────
+    def _go_home(self, *, reset: bool) -> None:
+        if self._thread is not None:
+            return
+        if reset:
+            self._state.reset_task()
+        else:
+            self._state.clear_result()
+        self._history = []
+        self.done_page.reset()
+        self.home_page.set_selected_file(self._state.input_path)
+        self.home_page.set_error("")
+        self._show_page(PageId.HOME, push=False)
 
-    def _media_filter(self) -> str:
-        extensions = sorted(AUDIO_EXTENSIONS | VIDEO_EXTENSIONS)
-        patterns = " ".join(f"*{extension}" for extension in extensions)
-        return f"Médias ({patterns});;Tous les fichiers (*)"
+    def _home_from_progress(self) -> None:
+        self._go_home(reset=False)
+
+    def _new_transcription(self) -> None:
+        if self._thread is not None:
+            self._pending_new = True
+            return
+        self._go_home(reset=True)
+
+    def _continue_from_home(self) -> None:
+        if self._state.input_path is None:
+            self._browse_file()
+            return
+        if self._active_key:
+            self._go_prompt()
+        else:
+            self._go_key(KeyMode.INITIAL)
+
+    def _capture_prompt(self) -> None:
+        if self._current == PageId.PROMPT and self._state.input_path is not None:
+            self._state.prompt_text = self.prompt_page.prompt_text()
+            self._state.prompt_edited = self.prompt_page.prompt_edited()
+
+    def _capture_settings(self) -> None:
+        if self._current == PageId.SETTINGS and self._settings_loaded:
+            self.settings_page.capture(self._state)
+
+    def _prompt_has_edits(self) -> bool:
+        if self._state.prompt_edited:
+            return True
+        return (
+            self._current == PageId.PROMPT
+            and self.prompt_page.prompt_edited()
+        )
+
+    # ── Fichier ────────────────────────────────────────────────────────────
 
     def _browse_file(self) -> None:
+        if self.is_busy or self._current not in (
+            PageId.HOME,
+            PageId.PROMPT,
+        ):
+            return
         start_dir = self._settings.last_input_dir or str(Path.home())
         path, _ = QFileDialog.getOpenFileName(
             self, "Choisir un fichier", start_dir, self._media_filter()
         )
         if path:
-            self.set_input_path(Path(path))
-            self._settings.last_input_dir = str(Path(path).parent)
-            self._settings.save()
+            self.select_file(Path(path), confirm_prompt=True)
 
-    def _on_input_edited(self) -> None:
-        text = self.input_edit.text().strip()
-        if text:
-            self.set_input_path(Path(text))
-        else:
-            self._input_path = None
-            self._clear_result()
-            self._update_state()
+    def _change_file(self) -> None:
+        if self.is_busy:
+            return
+        start_dir = self._settings.last_input_dir or str(Path.home())
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Choisir un fichier", start_dir, self._media_filter()
+        )
+        if path:
+            self.select_file(Path(path), confirm_prompt=True)
 
-    def set_input_path(self, path: Path) -> None:
+    def select_file(self, path: Path, *, confirm_prompt: bool = False) -> None:
+        if self.is_busy:
+            return
         path = Path(path).expanduser()
-        self._clear_errors()
-        if not path.exists():
-            self._set_error(
-                self.source_error, "Le fichier sélectionné n'existe plus."
-            )
-            self._input_path = None
-            self._update_state()
+        error = self._validate_input(path)
+        if error:
+            if self._current == PageId.HOME:
+                self.home_page.set_error(error)
+            elif self._current == PageId.PROMPT:
+                self.prompt_page.set_error(error)
+            elif self._current == PageId.SETTINGS:
+                self.settings_page.show_message(error)
+            else:
+                self.progress_page.append_log(error)
             return
-        if not path.is_file():
-            self._set_error(
-                self.source_error,
-                "Le fichier sélectionné n'est pas un fichier valide.",
-            )
-            self._input_path = None
-            self._update_state()
-            return
-        if not os.access(path, os.R_OK):
-            self._set_error(
-                self.source_error,
-                "Impossible de lire ce fichier. Vérifiez les permissions.",
-            )
-            self._input_path = None
-            self._update_state()
-            return
+        if confirm_prompt and self._prompt_has_edits():
+            if not self._dialogs.confirm_discard(
+                "Les modifications du prompt seront perdues. Continuer ?"
+            ):
+                return
+        self._state.input_path = path
+        self._state.prompt_path = None
+        self._state.prompt_text = None
+        self._state.prompt_edited = False
+        self._state.prompt_error = None
+        self._state.duration_s = None
+        self._state.duration_path = None
+        self._state.duration_pending = False
+        self._state.clear_result()
+        self._settings.last_input_dir = str(path.parent)
+        self.home_page.set_selected_file(path)
+        self.home_page.set_error("")
+        self.prompt_page.set_error("")
+        if self._active_key:
+            self._go_prompt()
+        else:
+            self._go_key(KeyMode.INITIAL)
 
-        self._input_path = path
-        self.input_edit.setText(str(path))
-        if not self._output_dir_user_set or not self.output_edit.text().strip():
-            self.output_edit.setText(str(path.parent))
-        self._load_prompt(path)
-        self._clear_result()
-        self._update_state()
+    @staticmethod
+    def _validate_input(path: Path) -> str | None:
+        if not path.exists():
+            return "Le fichier sélectionné n'existe plus."
+        if not path.is_file():
+            return "Le fichier sélectionné n'est pas un fichier valide."
+        if not os.access(path, os.R_OK):
+            return "Impossible de lire ce fichier. Vérifiez les permissions."
+        return None
+
+    @staticmethod
+    def _media_filter() -> str:
+        extensions = sorted(AUDIO_EXTENSIONS | VIDEO_EXTENSIONS)
+        patterns = " ".join(f"*{extension}" for extension in extensions)
+        return f"Médias ({patterns});;Tous les fichiers (*)"
+
+    # ── Clé ────────────────────────────────────────────────────────────────
+
+    def _go_key(
+        self, mode: KeyMode, *, return_page: PageId = PageId.PROMPT
+    ) -> None:
+        self._state.key_return_page = return_page
+        self.key_page.set_mode(mode)
+        self.key_page.set_keyring_available(self._keyring_available)
+        self.key_page.set_status(self._key_status_text())
+        self.key_page.clear_field()
+        self._show_page(PageId.KEY)
+
+    def _on_key_back(self) -> None:
+        if self._state.key_return_page == PageId.SETTINGS:
+            self._rewind_to(PageId.SETTINGS)
+        else:
+            self._back()
+
+    def _on_key_submitted(self, key: str, remember: bool) -> None:
+        key = key.strip()
+        if not key:
+            self.key_page.set_error("Saisissez une clé OpenRouter.")
+            return
+        self.options_page.key_form.remember.setChecked(remember)
+        if (
+            self._state.session_key == key
+            and self._state.key_source is KeySource.SESSION
+            and not remember
+        ):
+            self._after_key()
+            return
+        if remember:
+            try:
+                self._key_store.set(key)
+            except Exception as exc:
+                logger.warning("Écriture du trousseau impossible : %s", exc)
+                self._keyring_available = False
+                self._state.session_key = key
+                self._refresh_key_source()
+                self.key_page.set_keyring_available(False)
+                self.key_page.set_error(
+                    "Impossible d'enregistrer la clé dans le trousseau ; "
+                    "elle reste valable pour cette session."
+                )
+                return
+            self._keyring_key = key
+            self._state.session_key = None
+        else:
+            self._state.session_key = key
+        self._refresh_key_source()
+        self._after_key()
+
+    def _after_key(self) -> None:
+        if self._state.key_return_page == PageId.SETTINGS:
+            self.settings_page.show_message("")
+            self._rewind_to(PageId.SETTINGS)
+        else:
+            back = self._history[-1] if self._history else PageId.HOME
+            self._history = [back]
+            self._go_prompt(push=False)
+
+    # ── Prompt et durée ────────────────────────────────────────────────────
+
+    def _go_prompt(self, *, push: bool = True) -> None:
+        path = self._state.input_path
+        if path is None:
+            self._go_home(reset=False)
+            return
+        if (
+            not self._state.prompt_edited
+            and self._state.prompt_path is None
+            and self._state.prompt_text is None
+            and self._state.prompt_error is None
+        ):
+            self._load_prompt(path)
+        self.prompt_page.set_file(path)
+        if self._state.duration_path == path:
+            self.prompt_page.set_duration(
+                self._state.duration_s,
+                pending=self._state.duration_pending,
+            )
+        else:
+            self.prompt_page.set_duration(None, pending=True)
+        self.prompt_page.set_prompt(
+            self._state.prompt_text,
+            self._state.prompt_path,
+            self._state.prompt_error,
+            edited=self._state.prompt_edited,
+        )
+        self._show_page(PageId.PROMPT, push=push)
+        if self._state.duration_path != path and not self._state.duration_pending:
+            self._probe_duration(path)
 
     def _load_prompt(self, path: Path) -> None:
-        self._prompt_path = None
-        self._prompt_text = None
         try:
             prompt_path, prompt_text = resolve_prompt(path)
         except InvalidRequestError as exc:
-            self.prompt_path_label.setText("Prompt illisible")
-            self.prompt_preview.setText("")
-            self._set_error(self.prompt_error, exc.user_message)
+            self._state.prompt_path = None
+            self._state.prompt_text = None
+            self._state.prompt_error = exc.user_message
+        else:
+            self._state.prompt_path = prompt_path
+            self._state.prompt_text = prompt_text
+            self._state.prompt_error = None
+        self._state.prompt_edited = False
+
+    def _probe_duration(self, path: Path) -> None:
+        if self._state.duration_path == path and (
+            self._state.duration_s is not None
+            or self._state.duration_pending
+        ):
             return
-        if prompt_path is None:
-            self.prompt_path_label.setText("Aucun prompt détecté")
-            self.prompt_preview.setText("")
+        self._state.duration_path = path
+        self._state.duration_s = None
+        self._state.duration_pending = True
+        if self._current == PageId.PROMPT and self._state.input_path == path:
+            self.prompt_page.set_duration(None, pending=True)
+        self._duration_probe.start(path)
+
+    def _on_duration_ready(self, path: object, value: object) -> None:
+        path = Path(path)
+        if self._state.input_path != path or self._state.duration_path != path:
             return
-        self._prompt_path = prompt_path
-        self._prompt_text = prompt_text
-        self.prompt_path_label.setText(str(prompt_path))
-        self.prompt_preview.setText(self._preview(prompt_text or ""))
+        self._state.duration_pending = False
+        self._state.duration_s = None if value is None else float(value)
+        if self._current == PageId.PROMPT:
+            self.prompt_page.set_duration(self._state.duration_s, pending=False)
 
-    @staticmethod
-    def _preview(text: str) -> str:
-        lines = [line.strip() for line in text.splitlines() if line.strip()]
-        preview = " / ".join(lines[:2])
-        if len(lines) > 2 or len(preview) > 180:
-            preview = preview[:180] + "…"
-        return preview
+    def _on_duration_failed(self, path: object, message: str) -> None:
+        path = Path(path)
+        if self._state.input_path != path or self._state.duration_path != path:
+            return
+        self._state.duration_pending = False
+        self._state.duration_s = None
+        logger.warning("Durée indisponible pour %s : %s", path, message)
+        if self._current == PageId.PROMPT:
+            self.prompt_page.set_duration(None, pending=False)
 
-    def _edit_prompt(self) -> None:
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Modifier le prompt")
-        dialog.resize(620, 380)
-        layout = QVBoxLayout(dialog)
-        editor = QPlainTextEdit()
-        editor.setPlainText(self._prompt_text or "")
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addWidget(editor)
-        layout.addWidget(buttons)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            self._prompt_text = editor.toPlainText().strip() or None
-            self.prompt_preview.setText(
-                self._preview(self._prompt_text or "")
-            )
+    def _on_prompt_next(self) -> None:
+        path = self._state.input_path
+        if path is None:
+            return
+        error = self._validate_input(path)
+        if error:
+            self.prompt_page.set_error(error)
+            return
+        self._state.prompt_text = self.prompt_page.prompt_text()
+        self._state.prompt_edited = self.prompt_page.prompt_edited()
+        self._open_settings()
 
-    def _clear_prompt(self) -> None:
-        self._prompt_path = None
-        self._prompt_text = None
-        self.prompt_path_label.setText("Aucun prompt")
-        self.prompt_preview.setText("")
+    # ── Réglages et lancement ──────────────────────────────────────────────
+
+    def _open_settings(self) -> None:
+        self._settings_loaded = True
+        self.settings_page.load(self._state)
+        for model in self._settings.recent_models:
+            self.settings_page.add_model(model)
+        self._attach_pricing()
+        self._show_page(PageId.SETTINGS)
 
     def _browse_output(self) -> None:
-        start_dir = self.output_edit.text().strip() or str(
-            self._settings.last_input_dir or Path.home()
+        start_dir = (
+            self.settings_page.output_edit.text().strip()
+            or self._settings.last_input_dir
+            or str(Path.home())
         )
         path = QFileDialog.getExistingDirectory(
             self, "Choisir le dossier de sortie", start_dir
         )
         if path:
-            self.output_edit.setText(path)
-            self._output_dir_user_set = True
+            self.settings_page.set_output_dir(Path(path))
 
-    def _on_output_edited(self) -> None:
-        self._output_dir_user_set = True
-        self._set_error(self.output_error, "")
-
-    def _on_format_changed(self) -> None:
-        self._set_error(self.formats_error, "")
-
-    # ── Clé API ────────────────────────────────────────────────────────────
-
-    def _delete_key(self) -> None:
-        try:
-            self._key_store.delete()
-        except Exception as exc:
-            logger.warning("Suppression du trousseau impossible : %s", exc)
-            self._set_error(
-                self.api_error,
-                "Impossible de supprimer la clé du trousseau.",
+    def _use_source_dir(self) -> None:
+        if self._state.input_path is not None:
+            self.settings_page.set_output_dir(
+                self._state.input_path.parent, user_set=False
             )
-        self.api_key_edit.clear()
 
-    # ── Tâche ──────────────────────────────────────────────────────────────
-
-    def _default_service(
-        self, request: TranscribeRequest
-    ) -> TranscribeService:
-        return TranscribeService(
-            {Provider.OPENROUTER: OpenRouterEngine()}
-        )
-
-    def start_transcription(self) -> None:
-        if self._running or self._thread is not None:
+    def _launch(self) -> None:
+        if self.is_busy:
             return
-        validated = self._validate_form()
-        if validated is None:
+        if not self.settings_page.commit(self._state):
             return
-        input_path, output_dir, formats, model, api_key = validated
-        prompt_text = (self._prompt_text or "").strip() or None
-
-        paths = output_paths(input_path, output_dir, formats)
+        if self._state.input_path is None:
+            return
+        if not self._active_key:
+            self.settings_page.show_message(KEY_MISSING_MESSAGE)
+            self._go_key(KeyMode.CORRECTION, return_page=PageId.SETTINGS)
+            return
+        output_dir = self._state.output_dir or self._state.input_path.parent
+        paths = output_paths(self._state.input_path, output_dir, self._state.formats)
         existing = existing_outputs(paths)
         if existing and not self._dialogs.confirm_overwrite(existing):
-            self.status_label.setText(
-                "Transcription annulée : les fichiers existants sont "
-                "conservés."
+            self.settings_page.show_message(
+                "Transcription annulée : les fichiers existants sont conservés."
             )
             return
-
-        if (
-            self.remember_checkbox.isChecked()
-            and self.api_key_edit.text().strip()
-        ):
-            try:
-                self._key_store.set(self.api_key_edit.text().strip())
-            except Exception as exc:
-                logger.warning("Écriture du trousseau impossible : %s", exc)
-                self._set_error(
-                    self.api_error,
-                    "Impossible d'enregistrer la clé dans le trousseau ; "
-                    "elle reste valable pour cette session.",
-                )
-
-        self._settings.add_recent_model(model)
-        self._add_model_item(model)
+        self._settings.add_recent_model(self._state.model)
         self.save_settings()
-
         request = TranscribeRequest(
-            input_path=input_path,
+            input_path=self._state.input_path,
             provider=Provider.OPENROUTER,
-            model=model,
-            language=self.language_combo.currentData(),
-            prompt_text=prompt_text,
+            model=self._state.model,
+            language=self._state.language,
+            prompt_text=self._state.prompt_text,
             output_dir=output_dir,
-            formats=formats,
+            formats=self._state.formats,
             overwrite=bool(existing),
-            api_key=api_key,
+            api_key=self._active_key,
         )
         try:
             self._start_worker(request)
         except Exception as exc:
             logger.warning("Démarrage de la tâche impossible : %s", exc)
-            self._dialogs.show_error(
-                "Transcription impossible",
-                "Impossible de démarrer la transcription.",
-                str(exc),
+            self.settings_page.show_message(
+                "Impossible de démarrer la transcription."
             )
 
     def _start_worker(self, request: TranscribeRequest) -> None:
@@ -862,199 +703,226 @@ class MainWindow(QMainWindow):
         thread = QThread(self)
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
-        worker.progress.connect(self.on_worker_progress)
-        worker.log.connect(self.on_worker_log)
-        worker.finished.connect(self.on_worker_finished)
-        worker.failed.connect(self.on_worker_failed)
-        worker.cancelled.connect(self.on_worker_cancelled)
-        for signal in (
-            worker.finished,
-            worker.failed,
-            worker.cancelled,
-        ):
+        worker.progress.connect(self._on_progress)
+        worker.log.connect(self._on_log)
+        worker.finished.connect(self._on_finished)
+        worker.failed.connect(self._on_failed)
+        worker.cancelled.connect(self._on_cancelled)
+        for signal in (worker.finished, worker.failed, worker.cancelled):
             signal.connect(thread.quit)
         thread.finished.connect(self._on_thread_finished)
         thread.finished.connect(thread.deleteLater)
         self._worker = worker
         self._thread = thread
-
-        self._running = True
+        self._busy = True
         self._writing = False
-        self._task_started = time.monotonic()
-        self._last_progress = None
-        self.progress_bar.setRange(0, 0)
-        self.progress_bar.setFormat("")
-        self.phase_label.setText("Validation…")
-        self.elapsed_label.setText("")
-        self.status_label.setText("Transcription en cours…")
-        self.cost_label.setText("")
-        self.result_paths_label.setText("")
-        self.open_folder_button.setEnabled(False)
-        self._elapsed_timer.start()
-        self._update_state()
+        self._pending_new = False
+        self._state.clear_result()
+        self.progress_page.start_task(request.input_path.name)
+        self._show_page(PageId.PROGRESS)
         thread.start()
 
-    def cancel_transcription(self) -> None:
-        if (
-            self._running
-            and not self._writing
-            and self._cancel_token is not None
-        ):
-            self._cancel_token.cancel()
-            self.status_label.setText("Annulation en cours…")
-            self.cancel_button.setEnabled(False)
-            logger.info("Annulation demandée")
-
-    def on_worker_progress(self, update: ProgressUpdate) -> None:
-        self._last_progress = update
+    def _on_progress(self, update: ProgressUpdate) -> None:
         if update.phase == "writing":
             self._writing = True
-            self.progress_bar.setRange(0, 0)
-            self.progress_bar.setFormat("")
-            self.phase_label.setText("Écriture des fichiers…")
-            self._update_state()
-            self._update_elapsed()
-            return
-        if update.phase == "done":
-            self.progress_bar.setRange(0, 1000)
-            self.progress_bar.setValue(1000)
-            self.progress_bar.setFormat("100 %")
-            self.phase_label.setText("Terminé")
-            self._update_elapsed()
-            return
+        self.progress_page.update_progress(update)
 
-        label = _PHASE_LABELS.get(update.phase, update.phase)
-        detail = update.detail.strip()
-        if update.total is not None and update.total > 0:
-            ratio = min(max(update.current, 0.0), update.total) / update.total
-            percent = round(ratio * 1000)
-            self.progress_bar.setRange(0, 1000)
-            self.progress_bar.setValue(percent)
-            self.progress_bar.setFormat(f"{percent // 10} %")
-            audio = (
-                f"{format_seconds(update.current)} / "
-                f"{format_seconds(update.total)}"
-            )
-            parts = [label, audio, f"{percent // 10} %"]
-            if detail and detail != label:
-                parts.append(detail)
-            self.phase_label.setText(" — ".join(parts))
-        else:
-            self.progress_bar.setRange(0, 0)
-            self.progress_bar.setFormat("")
-            self.phase_label.setText(
-                f"{label} — {detail}" if detail and detail != label else label
-            )
-        if (
-            self._cancel_token is not None
-            and self._cancel_token.is_cancelled()
-            and self._running
-        ):
-            self.status_label.setText("Annulation en cours…")
-        self._update_elapsed()
+    def _on_log(self, text: str) -> None:
+        self.progress_page.append_log(text)
 
-    def _update_elapsed(self) -> None:
-        if self._task_started <= 0:
-            return
-        elapsed = max(0.0, time.monotonic() - self._task_started)
-        text = f"Temps écoulé : {format_seconds(elapsed)}"
-        progress = self._last_progress
-        if (
-            progress is not None
-            and progress.total is not None
-            and progress.total > 0
-            and progress.current > 0
-        ):
-            eta = elapsed * (
-                progress.total - progress.current
-            ) / progress.current
-            text += f" — ETA : {format_seconds(max(0.0, eta))}"
-        self.elapsed_label.setText(text)
-
-    def on_worker_log(self, text: str) -> None:
-        self.log_view.appendPlainText(text)
-        logger.info("%s", text)
-
-    def on_worker_finished(self, result: TranscribeResult) -> None:
-        self._finish_task()
-        self.status_label.setText("Transcription terminée")
-        self.result_paths_label.setText(
-            "\n".join(str(path) for path in result.output_paths)
+    def _on_finished(self, result) -> None:
+        self._state.result = result
+        self._state.error = None
+        self._state.cancelled = False
+        self.progress_page.update_progress(
+            ProgressUpdate("done", detail="Terminé")
         )
-        if result.cost_usd is None:
-            self.cost_label.setText("Coût OpenRouter : Coût indisponible")
-        else:
-            self.cost_label.setText(
-                f"Coût OpenRouter : ${result.cost_usd:.6f}"
-            )
-        if result.output_paths:
-            self._output_folder = result.output_paths[0].parent
-        else:
-            text = self.output_edit.text().strip()
-            self._output_folder = Path(text) if text else None
-        self.open_folder_button.setEnabled(
-            self._output_folder is not None
-            and self._output_folder.is_dir()
-        )
+        file_name = self._state.input_path.name if self._state.input_path else ""
+        self.done_page.show_result(result, file_name)
+        self._show_page(PageId.DONE)
         logger.info("Transcription terminée")
 
-    def on_worker_failed(self, message: str, detail: str) -> None:
-        self._finish_task()
-        self.status_label.setText("Échec de la transcription")
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setFormat("")
-        self.phase_label.clear()
-        self.elapsed_label.clear()
-        self.open_folder_button.setEnabled(False)
-        full_detail = detail or ""
-        journal = self.log_view.toPlainText()[-4000:]
-        if journal:
-            full_detail += "\n\nJournal :\n" + journal
-        self._dialogs.show_error(
-            "Transcription impossible",
-            message or "La transcription a échoué.",
-            full_detail,
-        )
-        logger.warning("Transcription échouée : %s", message)
-
-    def on_worker_cancelled(self) -> None:
-        self._finish_task()
-        self.status_label.setText("Transcription annulée.")
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setFormat("")
-        self.phase_label.clear()
-        self.elapsed_label.clear()
-        self.result_paths_label.setText("")
-        self.cost_label.setText("")
-        self.open_folder_button.setEnabled(False)
-        logger.info("Transcription annulée")
-
-    def _finish_task(self) -> None:
-        self._running = False
+    def _on_failed(self, error: TranscribeError) -> None:
+        self._state.error = error
+        self._state.result = None
+        self._state.cancelled = False
         self._writing = False
-        self._elapsed_timer.stop()
-        self._update_state()
+        can_edit_key = isinstance(error, EngineUnavailableError)
+        can_change_file = (
+            isinstance(error, InvalidRequestError)
+            and "fichier" in error.user_message.lower()
+        )
+        can_open_folder = (
+            self._state.output_dir is not None
+            and self._state.output_dir.is_dir()
+        )
+        self.progress_page.show_error(
+            error,
+            can_edit_key=can_edit_key,
+            can_change_file=can_change_file,
+            can_open_folder=can_open_folder,
+        )
+        self.progress_page.set_busy(self.is_busy)
+        logger.warning("Transcription échouée : %s", error.user_message)
+
+    def _on_cancelled(self) -> None:
+        self._state.cancelled = True
+        self._state.error = None
+        self._state.result = None
+        self._writing = False
+        self.progress_page.show_cancelled()
+        self.progress_page.set_busy(self.is_busy)
+        logger.info("Transcription annulée")
 
     def _on_thread_finished(self) -> None:
         self._thread = None
         self._worker = None
-        self._update_state()
+        self._cancel_token = None
+        self._busy = False
+        self._writing = False
+        self.progress_page.set_busy(False)
+        self._update_gear()
         if self._close_when_done:
             self._close_when_done = False
             self.close()
+            return
+        if self._pending_new:
+            self._pending_new = False
+            self._go_home(reset=True)
 
-    # ── Fin de fenêtre et divers ───────────────────────────────────────────
+    def cancel_transcription(self) -> None:
+        if (
+            self._thread is None
+            or self._cancel_token is None
+            or self._writing
+        ):
+            return
+        self._cancel_token.cancel()
+        self.progress_page.show_cancelling()
+        logger.info("Annulation demandée")
 
-    def _on_escape(self) -> None:
-        if self._running:
-            self.cancel_transcription()
+    def _back_to_settings(self) -> None:
+        if self._thread is not None:
+            return
+        self._rewind_to(PageId.SETTINGS)
+
+    def _edit_key_after_error(self) -> None:
+        if self._thread is not None:
+            return
+        self._go_key(KeyMode.CORRECTION, return_page=PageId.SETTINGS)
+
+    def _open_log(self) -> None:
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(log_file_path())))
+
+    def _open_output_folder(self) -> None:
+        result = self._state.result
+        folder = (
+            result.output_paths[0].parent
+            if result is not None and result.output_paths
+            else self._state.output_dir
+        )
+        if folder is not None and folder.is_dir():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+
+    # ── Options ────────────────────────────────────────────────────────────
+
+    def _open_options(self) -> None:
+        if self.is_busy or self._current == PageId.OPTIONS:
+            return
+        if self._current == PageId.PROMPT:
+            self._capture_prompt()
+        if self._current == PageId.SETTINGS:
+            self._capture_settings()
+        self.options_page.load(
+            self._key_status_text(),
+            self._keyring_available,
+            build_info(),
+            self._can_delete_key(),
+        )
+        self._show_page(PageId.OPTIONS)
+
+    def _save_options_key(self, key: str, remember: bool) -> None:
+        key = key.strip()
+        if not key:
+            self.options_page.set_error("Saisissez une clé OpenRouter.")
+            return
+        self.key_page.key_form.remember.setChecked(remember)
+        if remember:
+            try:
+                self._key_store.set(key)
+            except Exception as exc:
+                logger.warning("Écriture du trousseau impossible : %s", exc)
+                self._keyring_available = False
+                self._state.session_key = key
+                self._refresh_key_source()
+                self.options_page.set_keyring_available(False)
+                self.options_page.set_error(
+                    "Impossible d'enregistrer la clé dans le trousseau ; "
+                    "elle reste valable pour cette session."
+                )
+                return
+            self._keyring_key = key
+            self._state.session_key = None
+            self.options_page.show_saved(
+                "Clé enregistrée dans le trousseau."
+            )
         else:
-            self.close()
+            self._state.session_key = key
+            self.options_page.show_saved(
+                "Clé de session enregistrée pour cette exécution."
+            )
+        self._refresh_key_source()
+
+    def _delete_options_key(self) -> None:
+        if not self._dialogs.confirm_delete_key():
+            return
+        if self._keyring_key is not None:
+            try:
+                self._key_store.delete()
+            except Exception as exc:
+                logger.warning("Suppression du trousseau impossible : %s", exc)
+                self.options_page.set_error(
+                    "Impossible de supprimer la clé du trousseau."
+                )
+                return
+        self._keyring_key = None
+        self._state.session_key = None
+        self._refresh_key_source()
+        self.options_page.clear_field()
+        self.options_page.set_error("")
+        if self._state.key_source is KeySource.ENV:
+            self.options_page.show_saved(
+                "Clé du trousseau supprimée ; la clé d'environnement reste "
+                "active."
+            )
+        else:
+            self.options_page.show_saved("Clé supprimée.")
+
+    # ── Réglages, fermeture et raccourcis ──────────────────────────────────
+
+    def save_settings(self) -> None:
+        if self._settings_loaded:
+            self.settings_page.capture(self._state)
+        self._settings.geometry = self.saveGeometry()
+        if self._state.input_path is not None:
+            self._settings.last_input_dir = str(self._state.input_path.parent)
+        self._settings.model = self._state.model
+        self._settings.language = self._state.language or ""
+        self._settings.formats = {
+            fmt.value for fmt in self._state.formats
+        }
+        self._settings.output_dir = (
+            str(self._state.output_dir)
+            if self._state.output_dir_user_set and self._state.output_dir
+            else ""
+        )
+        self._settings.remember_api_key = (
+            self.key_page.key_form.remember.isChecked()
+        )
+        self._settings.save()
 
     def closeEvent(self, event: QCloseEvent) -> None:
-        if self._running or self._thread is not None:
+        if self.is_busy:
             if not self._dialogs.confirm_close_while_running():
                 event.ignore()
                 return
@@ -1062,78 +930,15 @@ class MainWindow(QMainWindow):
             self.cancel_transcription()
             event.ignore()
             return
+        if self._current == PageId.OPTIONS and self.options_page.is_dirty():
+            if not self._dialogs.confirm_discard(
+                "La clé saisie n'est pas enregistrée. Quitter ?"
+            ):
+                event.ignore()
+                return
         self.save_settings()
+        self._duration_probe.shutdown()
         super().closeEvent(event)
-
-    def _open_output_folder(self) -> None:
-        if self._output_folder is not None:
-            QDesktopServices.openUrl(
-                QUrl.fromLocalFile(str(self._output_folder))
-            )
-
-    def _on_log_toggle(self, checked: bool) -> None:
-        self.log_view.setVisible(checked)
-        self._settings.log_visible = checked
-        self._settings.save()
-
-    def show_about(self) -> None:
-        info = build_info()
-        text = (
-            f"EcoTranscribe Desktop {info['version']}\n"
-            f"Édition {info['flavor']} — OpenRouter\n"
-            f"Commit : {info['commit']}\n"
-            f"Build : {info['build_date']}\n"
-            f"Licence : {info['license']}\n"
-            f"Source : {info['source']}\n\n"
-            "Notices tierces : THIRD_PARTY_NOTICES.md, inclus dans "
-            "l'application."
-        )
-        self._dialogs.show_info("À propos d'EcoTranscribe Desktop", text)
-
-    def save_settings(self) -> None:
-        self._settings.geometry = self.saveGeometry()
-        if self._input_path is not None:
-            self._settings.last_input_dir = str(self._input_path.parent)
-        self._settings.output_dir = (
-            self.output_edit.text().strip()
-            if self._output_dir_user_set
-            else ""
-        )
-        self._settings.model = self._current_model()
-        language = self.language_combo.currentData()
-        self._settings.language = language or ""
-        self._settings.formats = {
-            value
-            for value, checked in (
-                ("srt", self.srt_checkbox.isChecked()),
-                ("txt", self.txt_checkbox.isChecked()),
-            )
-            if checked
-        }
-        self._settings.remember_api_key = self.remember_checkbox.isChecked()
-        self._settings.log_visible = self.log_toggle.isChecked()
-        self._settings.save()
-
-    def _clear_result(self) -> None:
-        self.status_label.setText(
-            "Prêt à transcrire"
-            if self._input_path is not None
-            else "Choisissez un fichier"
-        )
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setFormat("")
-        self.phase_label.setText(
-            "Prêt à transcrire"
-            if self._input_path is not None
-            else "Choisissez un fichier"
-        )
-        self.elapsed_label.clear()
-        self.result_paths_label.setText("")
-        self.cost_label.setText("")
-        self.open_folder_button.setEnabled(False)
-
-    # ── Drag & drop ────────────────────────────────────────────────────────
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
         if event.mimeData().hasUrls():
@@ -1142,11 +947,51 @@ class MainWindow(QMainWindow):
             event.ignore()
 
     def dropEvent(self, event: QDropEvent) -> None:
+        if self.is_busy or self._current not in (
+            PageId.HOME,
+            PageId.PROMPT,
+        ):
+            event.ignore()
+            return
         for url in event.mimeData().urls():
             if url.isLocalFile():
                 path = Path(url.toLocalFile())
                 if path.is_file():
-                    self.set_input_path(path)
+                    self.select_file(path, confirm_prompt=True)
                     event.acceptProposedAction()
                     return
         event.ignore()
+
+    def _primary_shortcut(self) -> None:
+        if self._current == PageId.HOME:
+            self._continue_from_home()
+        elif self._current == PageId.KEY:
+            self.key_page.next_button.click()
+        elif self._current == PageId.PROMPT:
+            self.prompt_page.next_button.click()
+        elif self._current == PageId.SETTINGS:
+            self.settings_page.launch_button.click()
+
+    def _escape(self) -> None:
+        if self._current == PageId.PROGRESS:
+            if self.is_busy:
+                self.cancel_transcription()
+            else:
+                self._back_to_settings()
+        elif self._current == PageId.KEY:
+            self._on_key_back()
+        elif self._current in (
+            PageId.PROMPT,
+            PageId.SETTINGS,
+            PageId.OPTIONS,
+        ):
+            self._back()
+        elif self._current == PageId.HOME:
+            self.close()
+        elif self._current == PageId.DONE:
+            self._go_home(reset=False)
+
+    def _default_service(
+        self, request: TranscribeRequest
+    ) -> TranscribeService:
+        return TranscribeService({Provider.OPENROUTER: OpenRouterEngine()})

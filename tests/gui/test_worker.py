@@ -32,6 +32,10 @@ class FakeService:
             raise CancelledError()
         if self.behaviour == "error":
             raise TranscribeError("échec utilisateur", detail="détail")
+        if self.behaviour == "hint":
+            raise TranscribeError(
+                "échec utilisateur", detail="détail", hint="indice"
+            )
         if self.behaviour == "unexpected":
             raise RuntimeError("boom")
         return TranscribeResult(
@@ -93,17 +97,32 @@ def test_worker_maps_expected_error(qtbot, tmp_path: Path) -> None:
     worker = TranscribeWorker(
         FakeService("error"), _request(tmp_path), CancelToken()
     )
-    failures: list[tuple[str, str]] = []
-    worker.failed.connect(lambda message, detail: failures.append((message, detail)))
+    failures: list[TranscribeError] = []
+    worker.failed.connect(failures.append)
     worker.run()
-    assert failures == [("échec utilisateur", "détail")]
+    assert len(failures) == 1
+    assert failures[0].user_message == "échec utilisateur"
+    assert failures[0].detail == "détail"
 
 
 def test_worker_maps_unexpected_error(qtbot, tmp_path: Path) -> None:
     worker = TranscribeWorker(
         FakeService("unexpected"), _request(tmp_path), CancelToken()
     )
-    failures: list[tuple[str, str]] = []
-    worker.failed.connect(lambda message, detail: failures.append((message, detail)))
+    failures: list[TranscribeError] = []
+    worker.failed.connect(failures.append)
     worker.run()
-    assert failures == [("La transcription a échoué.", "boom")]
+    assert len(failures) == 1
+    assert failures[0].user_message == "La transcription a échoué."
+    assert failures[0].detail == "boom"
+
+
+def test_worker_preserves_error_hint(qtbot, tmp_path: Path) -> None:
+    worker = TranscribeWorker(
+        FakeService("hint"), _request(tmp_path), CancelToken()
+    )
+    failures: list[TranscribeError] = []
+    worker.failed.connect(failures.append)
+    worker.run()
+    assert len(failures) == 1
+    assert failures[0].hint == "indice"

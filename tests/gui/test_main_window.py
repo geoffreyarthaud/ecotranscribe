@@ -1,599 +1,359 @@
-import threading
-import time
+from __future__ import annotations
+
 from pathlib import Path
 
-import pytest
 from PySide6.QtCore import QSettings
-from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import QFormLayout, QLineEdit
+from PySide6.QtWidgets import QPushButton
 
-from ecotranscribe.core.config import OPENROUTER_MODEL, OPENROUTER_MODELS
-from ecotranscribe.core.errors import CancelledError, TranscribeError
+from ecotranscribe.core.config import OPENROUTER_MODEL
+from ecotranscribe.core.errors import EngineUnavailableError, TranscribeError
 from ecotranscribe.core.models import (
-    ProgressUpdate,
+    OutputFormat,
     Provider,
-    Segment,
     TranscribeResult,
 )
 from ecotranscribe.gui.main_window import MainWindow
-from ecotranscribe.gui.pricing import PricingClient
 from ecotranscribe.gui.settings import AppSettings, MemoryStore
+from ecotranscribe.gui.state import PageId
 
-from .conftest import FakeDialogs
+from .conftest import (
+    FakeDialogs,
+    FakeDurationProbe,
+    FakePricingClient,
+    FakeService,
+)
 
 
-class FakePricingClient(PricingClient):
-    def __init__(self) -> None:
-        super().__init__()
-        self.fetched: list[str] = []
+def _source(tmp_path: Path) -> Path:
+    path = tmp_path / "a.mp3"
+    path.write_bytes(b"x")
+    return path
 
-    def fetch(self, model: str) -> None:
-        self.fetched.append(model)
+
+def _result(tmp_path: Path) -> TranscribeResult:
+    srt = tmp_path / "a.srt"
+    srt.write_text("1\n00:00:00,000 --> 00:00:01,000\nBonjour\n", encoding="utf-8")
+    return TranscribeResult(
+        output_paths=(srt,),
+        text="Bonjour",
+        segments=(),
+        language="fr",
+        cost_usd=0.001234,
+        provider=Provider.OPENROUTER,
+        model=OPENROUTER_MODEL,
+        duration_s=1.0,
+    )
 
 
 def _window(
+    qtbot,
     settings: AppSettings,
     *,
-    key_store: MemoryStore | None = None,
-    dialogs: FakeDialogs | None = None,
-    service_factory=None,
-    pricing_client: PricingClient | None = None,
-) -> MainWindow:
-    return MainWindow(
-        settings=settings,
-        key_store=key_store or MemoryStore(),
-        dialogs=dialogs or FakeDialogs(),
-        service_factory=service_factory,
-        pricing_client=pricing_client,
-    )
-
-
-def test_window_construction_without_network(
-    qtbot, app_settings: AppSettings
-) -> None:
-    def should_not_run(request):
-        raise AssertionError("aucun service ne doit être créé")
-
-    window = _window(app_settings, service_factory=should_not_run)
-    qtbot.addWidget(window)
-
-    assert window.minimumWidth() >= 760
-    assert window.minimumHeight() >= 640
-    assert window.provider_openrouter.isChecked()
-    assert window.provider_whisper.isEnabled() is False
-    assert "édition lite" in window.whisper_reason.text()
-    assert "Édition full" in window.whisper_reason.text()
-    assert window.launch_button.isEnabled() is False
-    assert window.model_combo.currentText() == OPENROUTER_MODEL
-    assert window.language_combo.currentData() == "fr"
-    assert window.srt_checkbox.isChecked()
-    assert window.txt_checkbox.isChecked()
-    assert "OpenRouter" in window.cloud_warning.text()
-    assert window.acceptDrops() is True
-    assert window.api_key_edit.echoMode() == QLineEdit.EchoMode.Password
-    assert window.api_key_edit.placeholderText() == "OPENROUTER_API_KEY"
-
-
-def test_model_list_contains_small_and_mini(
-    qtbot, app_settings: AppSettings
-) -> None:
-    client = FakePricingClient()
-    window = _window(app_settings, pricing_client=client)
-    qtbot.addWidget(window)
-
-    assert client.fetched == list(OPENROUTER_MODELS)
-    assert window.model_combo.currentData() == OPENROUTER_MODEL
-    assert window.model_combo.findData(OPENROUTER_MODELS[1]) >= 0
-
-
-def test_prices_are_added_without_changing_saved_model(
-    qtbot, app_settings: AppSettings
-) -> None:
-    client = FakePricingClient()
-    window = _window(app_settings, pricing_client=client)
-    qtbot.addWidget(window)
-
-    client.price_ready.emit(OPENROUTER_MODEL, 0.24)
-    client.price_ready.emit(OPENROUTER_MODELS[1], 0.21)
-
-    small = window.model_combo.findData(OPENROUTER_MODEL)
-    mini = window.model_combo.findData(OPENROUTER_MODELS[1])
-    assert window.model_combo.itemText(small) == (
-        f"{OPENROUTER_MODEL} (≈ $0.24/h)"
-    )
-    assert window.model_combo.itemText(mini) == (
-        f"{OPENROUTER_MODELS[1]} (≈ $0.21/h)"
-    )
-    assert window.model_combo.currentText() == (
-        f"{OPENROUTER_MODEL} (≈ $0.24/h)"
-    )
-
-    window.save_settings()
-    assert app_settings.model == OPENROUTER_MODEL
-
-
-def test_missing_price_keeps_plain_model_ids(
-    qtbot, app_settings: AppSettings
-) -> None:
-    client = FakePricingClient()
-    window = _window(app_settings, pricing_client=client)
-    qtbot.addWidget(window)
-
-    small = window.model_combo.findData(OPENROUTER_MODEL)
-    mini = window.model_combo.findData(OPENROUTER_MODELS[1])
-    assert window.model_combo.itemText(small) == OPENROUTER_MODEL
-    assert window.model_combo.itemText(mini) == OPENROUTER_MODELS[1]
-
-
-def test_price_update_does_not_overwrite_custom_model(
-    qtbot, app_settings: AppSettings
-) -> None:
-    client = FakePricingClient()
-    window = _window(app_settings, pricing_client=client)
-    qtbot.addWidget(window)
-
-    window.model_combo.setCurrentText("custom/model")
-    client.price_ready.emit(OPENROUTER_MODEL, 0.24)
-
-    assert window.model_combo.currentText() == "custom/model"
-    assert window._current_model() == "custom/model"
-
-
-def test_saved_mini_model_is_restored(
-    qtbot, app_settings: AppSettings
-) -> None:
-    app_settings.model = OPENROUTER_MODELS[1]
-    window = _window(app_settings)
-    qtbot.addWidget(window)
-
-    assert window.model_combo.currentData() == OPENROUTER_MODELS[1]
-
-
-def test_form_fields_grow_to_window_width(
-    qtbot, app_settings: AppSettings
-) -> None:
-    window = _window(app_settings)
-    qtbot.addWidget(window)
-    assert (
-        window.form_layout.fieldGrowthPolicy()
-        == QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
-    )
-
-
-def test_shortcuts_are_registered(
-    qtbot, app_settings: AppSettings
-) -> None:
-    window = _window(app_settings)
-    qtbot.addWidget(window)
-    shortcuts = {
-        shortcut.key().toString(QKeySequence.SequenceFormat.PortableText)
-        for shortcut in window.findChildren(QShortcut)
-    }
-    assert "Ctrl+O" in shortcuts
-    assert "Ctrl+Return" in shortcuts or "Ctrl+Enter" in shortcuts
-    assert "Esc" in shortcuts
-
-
-def test_file_selection_updates_output_and_prompt(
-    qtbot, app_settings: AppSettings, tmp_path: Path
-) -> None:
-    source = tmp_path / "réunion accentuée.mp3"
-    source.write_bytes(b"x")
-    prompt = tmp_path / "réunion accentuée.prompt.md"
-    prompt.write_text("RGAA\nDSFR\nAccessibilité", encoding="utf-8")
-    window = _window(app_settings)
-    qtbot.addWidget(window)
-
-    window.set_input_path(source)
-
-    assert window.input_edit.text() == str(source)
-    assert window.output_edit.text() == str(tmp_path)
-    assert window.prompt_path_label.text().endswith(".prompt.md")
-    assert "RGAA" in window.prompt_preview.text()
-    assert window.launch_button.isEnabled() is True
-
-
-def test_new_selection_resets_edited_prompt(
-    qtbot, app_settings: AppSettings, tmp_path: Path
-) -> None:
-    first = tmp_path / "first.mp3"
-    first.write_bytes(b"x")
-    (tmp_path / "first.prompt.md").write_text("prompt A", encoding="utf-8")
-    second = tmp_path / "second.mp3"
-    second.write_bytes(b"x")
-    (tmp_path / "second.prompt.txt").write_text("prompt B", encoding="utf-8")
-
-    window = _window(app_settings)
-    qtbot.addWidget(window)
-    window.set_input_path(first)
-    window._prompt_text = "édité"
-    window.set_input_path(second)
-
-    assert window._prompt_text == "prompt B"
-    assert window.prompt_path_label.text().endswith(".prompt.txt")
-    assert "prompt B" in window.prompt_preview.text()
-
-
-def test_key_is_loaded_into_password_field(
-    qtbot, app_settings: AppSettings
-) -> None:
-    window = _window(app_settings, key_store=MemoryStore("sk-or-secret"))
-    qtbot.addWidget(window)
-    assert window.api_key_edit.text() == "sk-or-secret"
-
-
-def test_settings_are_persisted_and_reloaded(
-    qtbot, tmp_path: Path
-) -> None:
-    path = tmp_path / "settings.ini"
-    settings = AppSettings(QSettings(str(path), QSettings.IniFormat))
-    window = _window(settings)
-    qtbot.addWidget(window)
-    window.model_combo.setCurrentText("custom/model")
-    window.language_combo.setCurrentIndex(
-        window.language_combo.findData("en")
-    )
-    window.srt_checkbox.setChecked(False)
-    window.remember_checkbox.setChecked(False)
-    window.log_toggle.setChecked(True)
-    window.save_settings()
-
-    reloaded_settings = AppSettings(
-        QSettings(str(path), QSettings.IniFormat)
-    )
-    second = _window(reloaded_settings)
-    qtbot.addWidget(second)
-    assert second.model_combo.currentText() == "custom/model"
-    assert second.language_combo.currentData() == "en"
-    assert second.srt_checkbox.isChecked() is False
-    assert second.txt_checkbox.isChecked() is True
-    assert second.remember_checkbox.isChecked() is False
-    assert second.log_view.isVisibleTo(second) is True
-
-
-def test_model_selection_is_saved_on_close(
-    qtbot, tmp_path: Path
-) -> None:
-    path = tmp_path / "settings.ini"
-    settings = AppSettings(QSettings(str(path), QSettings.IniFormat))
-    settings.model = OPENROUTER_MODELS[1]
-    settings.save()
-
-    window = _window(settings)
-    qtbot.addWidget(window)
-    window.model_combo.setCurrentIndex(
-        window.model_combo.findData(OPENROUTER_MODEL)
-    )
-    window.close()
-
-    reloaded = AppSettings(QSettings(str(path), QSettings.IniFormat))
-    assert reloaded.model == OPENROUTER_MODEL
-
-
-def test_key_never_written_to_qsettings(
-    qtbot, tmp_path: Path
-) -> None:
-    path = tmp_path / "settings.ini"
-    settings = AppSettings(QSettings(str(path), QSettings.IniFormat))
-    window = _window(settings, key_store=MemoryStore("sk-or-secret"))
-    qtbot.addWidget(window)
-    window.save_settings()
-    assert "sk-or-secret" not in path.read_text(encoding="utf-8")
-
-
-def test_about_uses_dialog_service(
-    qtbot, app_settings: AppSettings
-) -> None:
-    dialogs = FakeDialogs()
-    window = _window(app_settings, dialogs=dialogs)
-    qtbot.addWidget(window)
-    window.show_about()
-    assert dialogs.infos
-    text = dialogs.infos[0][1]
-    assert "0.2.0" in text
-    assert "lite" in text
-    assert "MIT" in text
-
-
-class FakeService:
-    def __init__(
-        self,
-        result: TranscribeResult | None = None,
-        *,
-        cancel: bool = False,
-        error: Exception | None = None,
-        block: bool = False,
-    ) -> None:
-        self.result = result or TranscribeResult(
-            output_paths=(Path("out.srt"),),
-            text="Bonjour",
-            segments=(Segment(1, 0.0, 1.0, "Bonjour"),),
-            language="fr",
-            cost_usd=0.000123,
-            provider=Provider.OPENROUTER,
-            model=OPENROUTER_MODEL,
-            duration_s=1.0,
-        )
-        self.cancel = cancel
-        self.error = error
-        self.block = block
-        self.request = None
-        self.cancel_token = None
-        self.started = threading.Event()
-
-    def transcribe(
-        self, request, *, on_progress=None, on_log=None, cancel=None
-    ):
-        self.request = request
-        self.cancel_token = cancel
-        on_progress(
-            ProgressUpdate("transcribing", 30.0, 120.0, "Tranche 1/4")
-        )
-        on_log("info", "message de test")
-        self.started.set()
-        if self.block:
-            while not cancel.is_cancelled():
-                time.sleep(0.01)
-            raise CancelledError()
-        if self.cancel:
-            cancel.cancel()
-            raise CancelledError()
-        if self.error:
-            raise self.error
-        return self.result
-
-
-def _ready_window(
-    qtbot,
-    app_settings: AppSettings,
-    tmp_path: Path,
-    *,
+    key: str = "",
+    duration: float = 12.0,
     service: FakeService | None = None,
     dialogs: FakeDialogs | None = None,
-    key: str = "sk-test",
-    pricing_client: PricingClient | None = None,
-) -> tuple[MainWindow, FakeService, FakeDialogs]:
-    source = tmp_path / "source.mp3"
-    source.write_bytes(b"x")
-    fake = service or FakeService()
+    store: MemoryStore | None = None,
+):
     dialogs = dialogs or FakeDialogs()
+    service = service or FakeService()
+    probe = FakeDurationProbe(duration)
+    store = store or MemoryStore(key)
     window = MainWindow(
-        settings=app_settings,
-        key_store=MemoryStore(key),
+        settings=settings,
+        key_store=store,
         dialogs=dialogs,
-        service_factory=lambda request: fake,
-        pricing_client=pricing_client,
+        service_factory=lambda request: service,
+        pricing_client=FakePricingClient(),
+        duration_probe=probe,
     )
     qtbot.addWidget(window)
-    window.set_input_path(source)
-    window.api_key_edit.setText(key)
-    return window, fake, dialogs
+    window.show()
+    return window, service, dialogs, probe, store
 
 
-def test_launch_requires_file(
-    qtbot, app_settings: AppSettings
-) -> None:
-    created: list[object] = []
-
-    def factory(request):
-        created.append(request)
-        return FakeService()
-
-    window = _window(app_settings, service_factory=factory)
-    qtbot.addWidget(window)
-    window.start_transcription()
-    assert created == []
-    assert window.source_error.isVisibleTo(window) is True
+def test_home_without_key_shows_note(qtbot, app_settings, monkeypatch) -> None:
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    window, _service, _dialogs, _probe, _store = _window(qtbot, app_settings)
+    assert window.current_page is PageId.HOME
+    assert window.home_page.key_note.isVisibleTo(window.home_page)
+    assert window.gear_button.isVisibleTo(window)
 
 
-def test_request_uses_model_id_with_price_suffix(
-    qtbot, app_settings: AppSettings, tmp_path: Path
-) -> None:
-    client = FakePricingClient()
-    window, fake, _ = _ready_window(
-        qtbot, app_settings, tmp_path, pricing_client=client
+def test_select_file_with_key_skips_key_page(qtbot, app_settings, tmp_path) -> None:
+    window, _service, _dialogs, _probe, _store = _window(
+        qtbot, app_settings, key="sk-or-secret"
     )
-
-    client.price_ready.emit(OPENROUTER_MODEL, 0.24)
-    window.start_transcription()
-
-    qtbot.waitUntil(lambda: fake.request is not None, timeout=3000)
-    assert fake.request.model == OPENROUTER_MODEL
+    window.select_file(_source(tmp_path))
+    assert window.current_page is PageId.PROMPT
 
 
-def test_missing_output_dir_is_inline_error(
-    qtbot, app_settings: AppSettings, tmp_path: Path
-) -> None:
-    window, fake, _ = _ready_window(qtbot, app_settings, tmp_path)
-    window.output_edit.setText(str(tmp_path / "absent"))
-    window.start_transcription()
-    assert window.output_error.isVisibleTo(window) is True
-    assert fake.request is None
+def test_select_file_without_key_goes_to_key(qtbot, app_settings, tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    window, _service, _dialogs, _probe, store = _window(qtbot, app_settings)
+    window.select_file(_source(tmp_path))
+    assert window.current_page is PageId.KEY
+    window.key_page.key_form.key_edit.setText("sk-or-secret")
+    window.key_page.next_button.click()
+    assert window.current_page is PageId.PROMPT
+    assert store.get() == "sk-or-secret"
 
 
-def test_missing_format_is_inline_error(
-    qtbot, app_settings: AppSettings, tmp_path: Path
-) -> None:
-    window, fake, _ = _ready_window(qtbot, app_settings, tmp_path)
-    window.srt_checkbox.setChecked(False)
-    window.txt_checkbox.setChecked(False)
-    window.start_transcription()
-    assert window.formats_error.isVisibleTo(window) is True
-    assert fake.request is None
-
-
-def test_missing_key_is_inline_error(
-    qtbot, app_settings: AppSettings, tmp_path: Path
-) -> None:
-    source = tmp_path / "source.mp3"
-    source.write_bytes(b"x")
-    fake = FakeService()
-    window = MainWindow(
-        settings=app_settings,
-        key_store=MemoryStore(),
-        dialogs=FakeDialogs(),
-        service_factory=lambda request: fake,
+def test_prompt_detection_and_async_duration(qtbot, app_settings, tmp_path) -> None:
+    source = _source(tmp_path)
+    (tmp_path / "a.prompt.md").write_text("Contexte initial", encoding="utf-8")
+    window, _service, _dialogs, probe, _store = _window(
+        qtbot, app_settings, key="sk-or-secret", duration=42.0
     )
-    qtbot.addWidget(window)
-    window.set_input_path(source)
-    window.api_key_edit.clear()
-    window.start_transcription()
-    assert window.api_error.isVisibleTo(window) is True
-    assert "Clé OpenRouter" in window.api_error.text()
-    assert fake.request is None
+    window.select_file(source)
+    qtbot.waitUntil(
+        lambda: "00:42" in window.prompt_page.duration_label.text(),
+        timeout=2000,
+    )
+    assert window.prompt_page.prompt_text() == "Contexte initial"
+    assert "a.prompt.md" in window.prompt_page.prompt_source.text()
+    assert probe.paths == [source]
 
 
-def test_overwrite_refusal_does_not_start(
-    qtbot, app_settings: AppSettings, tmp_path: Path
-) -> None:
-    source = tmp_path / "source.mp3"
-    source.write_bytes(b"x")
-    (tmp_path / "source.srt").write_text("ancien", encoding="utf-8")
-    fake = FakeService()
+def test_back_history_skips_key_when_key_exists(qtbot, app_settings, tmp_path) -> None:
+    window, _service, _dialogs, _probe, _store = _window(
+        qtbot, app_settings, key="sk-or-secret"
+    )
+    window.select_file(_source(tmp_path))
+    assert window.current_page is PageId.PROMPT
+    window.prompt_page.back_button.click()
+    assert window.current_page is PageId.HOME
+
+
+def test_launch_runs_service_and_shows_done(qtbot, app_settings, tmp_path) -> None:
+    source = _source(tmp_path)
+    service = FakeService(result=_result(tmp_path))
+    window, _service, _dialogs, _probe, _store = _window(
+        qtbot, app_settings, key="sk-or-secret", service=service
+    )
+    window.select_file(source)
+    window.prompt_page.next_button.click()
+    window.settings_page.launch_button.click()
+    qtbot.waitUntil(lambda: window.current_page is PageId.DONE, timeout=3000)
+    qtbot.waitUntil(lambda: not window.is_busy, timeout=3000)
+    assert service.request is not None
+    assert service.request.api_key == "sk-or-secret"
+    assert service.request.input_path == source
+    assert service.request.provider is Provider.OPENROUTER
+    assert "$0.001234" in window.done_page.cost_label.text()
+
+
+def test_failure_is_inline_with_hint_and_detail(qtbot, app_settings, tmp_path) -> None:
+    service = FakeService(
+        error=TranscribeError("Échec", detail="Trace technique", hint="Vérifiez la clé.")
+    )
+    window, _service, _dialogs, _probe, _store = _window(
+        qtbot, app_settings, key="sk-or-secret", service=service
+    )
+    window.select_file(_source(tmp_path))
+    window.prompt_page.next_button.click()
+    window.settings_page.launch_button.click()
+    qtbot.waitUntil(lambda: window.progress_page.alert is not None, timeout=3000)
+    qtbot.waitUntil(lambda: not window.is_busy, timeout=3000)
+    assert window.current_page is PageId.PROGRESS
+    assert "Vérifiez la clé" in window.progress_page.alert.text_label.text()
+    assert window.progress_page.alert.detail_view.toPlainText() == "Trace technique"
+
+
+def test_cancel_shows_neutral_state(qtbot, app_settings, tmp_path) -> None:
+    service = FakeService(block=True)
+    window, _service, _dialogs, _probe, _store = _window(
+        qtbot, app_settings, key="sk-or-secret", service=service
+    )
+    window.select_file(_source(tmp_path))
+    window.prompt_page.next_button.click()
+    window.settings_page.launch_button.click()
+    qtbot.waitUntil(service.started.is_set, timeout=2000)
+    window.progress_page.cancel_button.click()
+    service.release.set()
+    qtbot.waitUntil(lambda: window.progress_page.alert is not None, timeout=3000)
+    qtbot.waitUntil(lambda: not window.is_busy, timeout=3000)
+    assert "annulée" in window.progress_page.alert.title_label.text()
+    assert window.progress_page.alert.property("severity") == "info"
+
+
+def test_overwrite_refusal_keeps_settings(qtbot, app_settings, tmp_path) -> None:
+    source = _source(tmp_path)
+    (tmp_path / "a.srt").write_text("ancien", encoding="utf-8")
     dialogs = FakeDialogs(overwrite=False)
-    window = MainWindow(
-        settings=app_settings,
-        key_store=MemoryStore("sk-test"),
-        dialogs=dialogs,
-        service_factory=lambda request: fake,
+    service = FakeService()
+    window, _service, _dialogs, _probe, _store = _window(
+        qtbot, app_settings, key="sk-or-secret", service=service, dialogs=dialogs
     )
-    qtbot.addWidget(window)
-    window.set_input_path(source)
-    window.start_transcription()
-    assert dialogs.overwrite_calls == [(tmp_path / "source.srt",)]
-    assert fake.request is None
-    assert "conservés" in window.status_label.text()
-    assert (tmp_path / "source.srt").read_text(encoding="utf-8") == "ancien"
+    window.select_file(source)
+    window.prompt_page.next_button.click()
+    window.settings_page.launch_button.click()
+    assert window.current_page is PageId.SETTINGS
+    assert service.request is None
+    assert "conservés" in window.settings_page.message.text()
 
 
-def test_overwrite_accepted_sets_request_flag(
-    qtbot, app_settings: AppSettings, tmp_path: Path
+def test_options_save_and_delete_key(qtbot, app_settings, monkeypatch) -> None:
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    window, _service, dialogs, _probe, store = _window(qtbot, app_settings)
+    window.gear_button.click()
+    assert window.current_page is PageId.OPTIONS
+    window.options_page.key_form.key_edit.setText("sk-or-new")
+    window.options_page.save_button.click()
+    assert store.get() == "sk-or-new"
+    window.options_page.delete_button.click()
+    assert dialogs.delete_calls == 1
+    assert store.get() is None
+
+
+class _FailingDeleteStore(MemoryStore):
+    def delete(self) -> None:
+        raise RuntimeError("boom")
+
+
+def test_remembering_session_key_saves_to_keyring(
+    qtbot, app_settings, monkeypatch
 ) -> None:
-    source = tmp_path / "source.mp3"
-    source.write_bytes(b"x")
-    (tmp_path / "source.srt").write_text("ancien", encoding="utf-8")
-    fake = FakeService()
-    dialogs = FakeDialogs(overwrite=True)
-    window = MainWindow(
-        settings=app_settings,
-        key_store=MemoryStore("sk-test"),
-        dialogs=dialogs,
-        service_factory=lambda request: fake,
-    )
-    qtbot.addWidget(window)
-    window.set_input_path(source)
-    window.start_transcription()
-    qtbot.waitUntil(lambda: window.launch_button.isEnabled(), timeout=3000)
-    assert fake.request is not None
-    assert fake.request.overwrite is True
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    window, _service, _dialogs, _probe, store = _window(qtbot, app_settings)
+    window.state.session_key = "sk-or-session"
+    window._refresh_key_source()
+    window._on_key_submitted("sk-or-session", True)
+    assert store.get() == "sk-or-session"
+    assert window.state.key_source.value == "keyring"
 
 
-def test_progress_determinate_and_indeterminate(
-    qtbot, app_settings: AppSettings
+def test_delete_session_key_does_not_touch_keyring(
+    qtbot, app_settings, monkeypatch
 ) -> None:
-    window = _window(app_settings)
-    qtbot.addWidget(window)
-    window._task_started = time.monotonic() - 10.0
-    window.on_worker_progress(
-        ProgressUpdate("transcribing", 30.0, 120.0, "Tranche 1/4")
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    window, _service, _dialogs, _probe, _store = _window(
+        qtbot, app_settings, store=_FailingDeleteStore("")
     )
-    assert window.progress_bar.maximum() == 1000
-    assert window.progress_bar.value() == 250
-    assert "25 %" in window.phase_label.text()
-    assert "00:30" in window.phase_label.text()
-    assert "02:00" in window.phase_label.text()
-    assert "ETA" in window.elapsed_label.text()
+    window._save_options_key("sk-or-session", remember=False)
+    assert window.state.session_key == "sk-or-session"
+    window.options_page.delete_button.click()
+    assert window.state.session_key is None
+    assert window.state.key_source.value == "none"
 
-    window.on_worker_progress(
-        ProgressUpdate("extracting", detail="Extraction audio")
+
+def test_prompt_change_requires_confirmation(qtbot, app_settings, tmp_path) -> None:
+    first = _source(tmp_path)
+    second = tmp_path / "b.mp3"
+    second.write_bytes(b"x")
+    dialogs = FakeDialogs(discard_answer=False)
+    window, _service, _dialogs, _probe, _store = _window(
+        qtbot, app_settings, key="sk-or-secret", dialogs=dialogs
     )
-    assert window.progress_bar.maximum() == 0
-    assert "Extraction" in window.phase_label.text()
+    window.select_file(first)
+    window.prompt_page.prompt_edit.setPlainText("Prompt édité")
+    window.select_file(second, confirm_prompt=True)
+    assert window.state.input_path == first
+    assert len(dialogs.discard_calls) == 1
 
 
-def test_done_sets_full_progress_bar(
-    qtbot, app_settings: AppSettings
-) -> None:
-    window = _window(app_settings)
-    qtbot.addWidget(window)
-    window.on_worker_progress(
-        ProgressUpdate("transcribing", 120.0, 120.0, "Tranche 1/1")
+def test_key_never_written_to_settings_or_log(qtbot, tmp_path) -> None:
+    settings_path = tmp_path / "settings.ini"
+    settings = AppSettings(
+        QSettings(str(settings_path), QSettings.IniFormat)
     )
-    window.on_worker_progress(ProgressUpdate("done", detail="Terminé"))
-    assert window.progress_bar.maximum() == 1000
-    assert window.progress_bar.value() == 1000
-    assert "100 %" in window.progress_bar.format()
-
-
-def test_writing_phase_disables_cancel(
-    qtbot, app_settings: AppSettings
-) -> None:
-    window = _window(app_settings)
-    qtbot.addWidget(window)
-    window._running = True
-    window.cancel_button.setEnabled(True)
-    window.on_worker_progress(
-        ProgressUpdate("writing", detail="Écriture des fichiers")
+    service = FakeService(result=_result(tmp_path))
+    window, _service, _dialogs, _probe, _store = _window(
+        qtbot, settings, key="sk-or-very-secret", service=service
     )
-    assert window.cancel_button.isEnabled() is False
-    assert window.progress_bar.maximum() == 0
+    window.select_file(_source(tmp_path))
+    window.prompt_page.next_button.click()
+    window.settings_page.launch_button.click()
+    qtbot.waitUntil(lambda: window.current_page is PageId.DONE, timeout=3000)
+    qtbot.waitUntil(lambda: not window.is_busy, timeout=3000)
+    window.save_settings()
+    assert "sk-or-very-secret" not in settings_path.read_text(encoding="utf-8")
+    assert "sk-or-very-secret" not in window.progress_page.log.toPlainText()
 
 
-def test_cancel_calls_token_and_shows_pending(
-    qtbot, app_settings: AppSettings, tmp_path: Path
-) -> None:
-    fake = FakeService(block=True)
-    window, _, _ = _ready_window(
-        qtbot, app_settings, tmp_path, service=fake
+def test_settings_are_captured_on_close(qtbot, tmp_path) -> None:
+    settings_path = tmp_path / "settings.ini"
+    settings = AppSettings(
+        QSettings(str(settings_path), QSettings.IniFormat)
     )
-    window.start_transcription()
-    assert fake.started.wait(timeout=3)
-    window.cancel_transcription()
-    assert fake.cancel_token is not None
-    assert fake.cancel_token.is_cancelled() is True
-    assert "Annulation" in window.status_label.text()
-    assert window.cancel_button.isEnabled() is False
-    qtbot.waitUntil(lambda: window.launch_button.isEnabled(), timeout=3000)
-    assert "annulée" in window.status_label.text()
-
-
-def test_finished_updates_result_and_reenables(
-    qtbot, app_settings: AppSettings, tmp_path: Path
-) -> None:
-    fake = FakeService()
-    window, _, _ = _ready_window(
-        qtbot, app_settings, tmp_path, service=fake
+    window, _service, _dialogs, _probe, _store = _window(
+        qtbot, settings, key="sk-or-secret"
     )
-    window.start_transcription()
-    qtbot.waitUntil(lambda: window.launch_button.isEnabled(), timeout=3000)
-    assert "terminée" in window.status_label.text()
-    assert "0.000123" in window.cost_label.text()
-    assert window.open_folder_button.isEnabled() is True
-    assert "message de test" in window.log_view.toPlainText()
-
-
-def test_failed_shows_dialog(
-    qtbot, app_settings: AppSettings, tmp_path: Path
-) -> None:
-    fake = FakeService(error=TranscribeError("échec", detail="détail"))
-    window, _, dialogs = _ready_window(
-        qtbot, app_settings, tmp_path, service=fake
+    window.select_file(_source(tmp_path))
+    window.prompt_page.next_button.click()
+    window.settings_page.model_combo.setEditText("custom/model")
+    window.close()
+    reloaded = AppSettings(
+        QSettings(str(settings_path), QSettings.IniFormat)
     )
-    window.start_transcription()
-    qtbot.waitUntil(lambda: window.launch_button.isEnabled(), timeout=3000)
-    assert dialogs.errors
-    assert dialogs.errors[0][1] == "échec"
-    assert "détail" in dialogs.errors[0][2]
+    assert reloaded.model == "custom/model"
 
 
-def test_key_never_appears_in_log(
-    qtbot, app_settings: AppSettings, tmp_path: Path
-) -> None:
-    secret = "sk-or-very-secret"
-    fake = FakeService()
-    window, _, _ = _ready_window(
-        qtbot, app_settings, tmp_path, service=fake, key=secret
+def test_gear_is_disabled_while_running(qtbot, app_settings, tmp_path) -> None:
+    service = FakeService(block=True)
+    window, _service, _dialogs, _probe, _store = _window(
+        qtbot, app_settings, key="sk-or-secret", service=service
     )
-    window.start_transcription()
-    qtbot.waitUntil(lambda: window.launch_button.isEnabled(), timeout=3000)
-    assert secret not in window.log_view.toPlainText()
+    window.select_file(_source(tmp_path))
+    window.prompt_page.next_button.click()
+    window.settings_page.launch_button.click()
+    qtbot.waitUntil(service.started.is_set, timeout=2000)
+    assert window.gear_button.isEnabled() is False
+    service.release.set()
+    qtbot.waitUntil(lambda: not window.is_busy, timeout=3000)
+
+
+def test_back_after_key_entry_returns_home(qtbot, app_settings, tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    window, _service, _dialogs, _probe, _store = _window(qtbot, app_settings)
+    window.select_file(_source(tmp_path))
+    window.key_page.key_form.key_edit.setText("sk-or-secret")
+    window.key_page.next_button.click()
+    assert window.current_page is PageId.PROMPT
+    window.prompt_page.back_button.click()
+    assert window.current_page is PageId.HOME
+
+
+def test_key_error_opens_correction_and_returns_settings(qtbot, app_settings, tmp_path) -> None:
+    service = FakeService(error=EngineUnavailableError("Clé refusée"))
+    window, _service, _dialogs, _probe, _store = _window(
+        qtbot, app_settings, key="sk-or-secret", service=service
+    )
+    window.select_file(_source(tmp_path))
+    window.prompt_page.next_button.click()
+    window.settings_page.launch_button.click()
+    qtbot.waitUntil(lambda: window.progress_page.alert is not None, timeout=3000)
+    qtbot.waitUntil(lambda: not window.is_busy, timeout=3000)
+    buttons = window.progress_page.alert.findChildren(QPushButton)
+    edit = next(button for button in buttons if button.text() == "Modifier la clé")
+    edit.click()
+    assert window.current_page is PageId.KEY
+    window.key_page.key_form.key_edit.setText("sk-or-new")
+    window.key_page.next_button.click()
+    assert window.current_page is PageId.SETTINGS
+
+
+def test_close_while_running_waits_then_closes(qtbot, app_settings, tmp_path) -> None:
+    service = FakeService(block=True)
+    dialogs = FakeDialogs(close_answer=True)
+    window, _service, _dialogs, _probe, _store = _window(
+        qtbot, app_settings, key="sk-or-secret", service=service, dialogs=dialogs
+    )
+    window.select_file(_source(tmp_path))
+    window.prompt_page.next_button.click()
+    window.settings_page.launch_button.click()
+    qtbot.waitUntil(service.started.is_set, timeout=2000)
+    window.close()
+    assert dialogs.close_calls == 1
+    service.release.set()
+    qtbot.waitUntil(lambda: not window.isVisible(), timeout=3000)
+
+
+def test_old_provider_widgets_are_gone(qtbot, app_settings) -> None:
+    window, _service, _dialogs, _probe, _store = _window(
+        qtbot, app_settings, key="sk-or-secret"
+    )
+    assert not hasattr(window, "provider_openrouter")
+    assert not hasattr(window, "whisper_reason")
+    assert not hasattr(window, "api_key_edit")
+    assert not hasattr(window, "launch_button")
