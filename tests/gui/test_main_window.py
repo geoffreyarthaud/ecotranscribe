@@ -125,6 +125,19 @@ def test_back_history_skips_key_when_key_exists(qtbot, app_settings, tmp_path) -
     assert window.current_page is PageId.HOME
 
 
+def test_prompt_invalid_file_disables_next(qtbot, app_settings, tmp_path) -> None:
+    source = _source(tmp_path)
+    window, _service, _dialogs, _probe, _store = _window(
+        qtbot, app_settings, key="sk-or-secret"
+    )
+    window.select_file(source)
+    source.unlink()
+    window.prompt_page.next_button.click()
+    assert window.current_page is PageId.PROMPT
+    assert window.prompt_page.error_label.isVisibleTo(window.prompt_page)
+    assert window.prompt_page.next_button.isEnabled() is False
+
+
 def test_launch_runs_service_and_shows_done(qtbot, app_settings, tmp_path) -> None:
     source = _source(tmp_path)
     service = FakeService(result=_result(tmp_path))

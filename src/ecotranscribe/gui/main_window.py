@@ -623,6 +623,7 @@ class MainWindow(QMainWindow):
         error = self._validate_input(path)
         if error:
             self.prompt_page.set_error(error)
+            self.prompt_page.next_button.setEnabled(False)
             return
         self._state.prompt_text = self.prompt_page.prompt_text()
         self._state.prompt_edited = self.prompt_page.prompt_edited()
