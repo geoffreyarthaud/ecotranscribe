@@ -10,6 +10,11 @@
   OpenRouter et affiché entre parenthèses ; aucune indication si le réseau ou
   l'API échoue.
 
+### Modifié
+
+- Prérequis Python relevé à 3.13 ; Python 3.10 à 3.12 ne sont plus pris en
+  charge pour le CLI et le développement.
+
 ### Corrigé
 
 - Les réglages (dont le modèle sélectionné) sont enregistrés à la fermeture de

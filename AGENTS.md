@@ -85,7 +85,7 @@ uv run pyinstaller --noconfirm packaging/pyinstaller.spec
 
 ## Conventions
 
-- Python ≥ 3.10 ; la CI et le développement utilisent 3.13.
+- Python ≥ 3.13 ; la CI et le développement utilisent 3.13.
 - Annoter les types ; ajouter `from __future__ import annotations` en tête de
   module.
 - Contrats de données : `@dataclass(frozen=True, slots=True)` ; énumérations

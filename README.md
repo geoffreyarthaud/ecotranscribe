@@ -44,7 +44,7 @@ conservé.
 | Usage | Prérequis |
 |---|---|
 | Application desktop lite | macOS 12+, Windows 10 21H2+/11 x64, Ubuntu 22.04+ x64 |
-| CLI | Python ≥ 3.10, [uv](https://docs.astral.sh/uv/) |
+| CLI | Python ≥ 3.13, [uv](https://docs.astral.sh/uv/) |
 | Moteur Whisper local | `uv sync --extra whisper` |
 | Développement | `ffmpeg` et `ffprobe` dans le `PATH` (ou l'override ci-dessous) |
 
