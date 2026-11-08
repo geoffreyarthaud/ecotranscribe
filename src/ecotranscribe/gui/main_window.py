@@ -607,6 +607,7 @@ class MainWindow(QMainWindow):
             return
         self._state.duration_pending = False
         self._state.duration_s = None if value is None else float(value)
+        self.settings_page.set_duration(self._state.duration_s)
         if self._current == PageId.PROMPT:
             self.prompt_page.set_duration(self._state.duration_s, pending=False)
 
@@ -616,6 +617,7 @@ class MainWindow(QMainWindow):
             return
         self._state.duration_pending = False
         self._state.duration_s = None
+        self.settings_page.set_duration(None)
         logger.warning("Durée indisponible pour %s : %s", path, message)
         if self._current == PageId.PROMPT:
             self.prompt_page.set_duration(None, pending=False)

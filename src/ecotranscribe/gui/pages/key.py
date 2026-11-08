@@ -30,7 +30,7 @@ class KeyPage(WizardPage):
     back_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__("Clé OpenRouter", parent)
+        super().__init__("Clé OpenRouter", parent, show_title=False)
         self.intro = QLabel(_INITIAL_COPY)
         self.intro.setWordWrap(True)
         self.key_form = KeyForm()

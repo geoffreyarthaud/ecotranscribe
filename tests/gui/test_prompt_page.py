@@ -10,7 +10,6 @@ def test_prompt_page_shows_file_and_duration(qtbot) -> None:
     qtbot.addWidget(page)
     page.set_file(Path("/tmp/réunion.mp3"))
     page.set_duration(65, pending=False)
-    assert "réunion.mp3" in page.file_name.text()
     assert "01:05" in page.duration_label.text()
     assert str(Path("/tmp/réunion.mp3")) in page.file_path.text()
 

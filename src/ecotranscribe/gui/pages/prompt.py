@@ -23,14 +23,12 @@ class PromptPage(WizardPage):
     change_file_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__("Fichier et prompt", parent)
+        super().__init__("Fichier et prompt", parent, show_title=False)
         self._has_file = False
         self._edited = False
         self._loading = False
 
-        file_section = Section("Fichier")
-        self.file_name = QLabel("")
-        self.file_name.setProperty("role", "sectionTitle")
+        file_section = Section("Fichier", spacing=10)
         self.file_path = QLineEdit()
         self.file_path.setReadOnly(True)
         self.file_path.setProperty("role", "path")
@@ -38,17 +36,16 @@ class PromptPage(WizardPage):
         self.duration_label.setProperty("role", "muted")
         self.change_button = QPushButton("Changer de fichier")
         self.change_button.setProperty("variant", "tertiary")
-        file_section.add(self.file_name)
         file_section.add(self.file_path)
         file_section.add(self.duration_label)
         file_section.add(self.change_button)
 
-        prompt_section = Section("Prompt (optionnel)")
+        prompt_section = Section("Prompt (optionnel)", spacing=10)
         self.prompt_source = QLabel("")
         self.prompt_source.setProperty("role", "muted")
         self.prompt_source.setWordWrap(True)
         self.prompt_edit = QPlainTextEdit()
-        self.prompt_edit.setMinimumHeight(200)
+        self.prompt_edit.setFixedHeight(170)
         self.prompt_edit.setPlaceholderText(
             "Ex. : Réunion d'équipe. Intervenants : Camille, Nour. "
             "Vocabulaire : EcoTranscribe, SRT, OpenRouter."
@@ -98,7 +95,6 @@ class PromptPage(WizardPage):
 
     def set_file(self, path: Path) -> None:
         self._has_file = True
-        self.file_name.setText(path.name)
         self.file_path.setText(str(path))
         self.next_button.setEnabled(True)
         self.set_error("")

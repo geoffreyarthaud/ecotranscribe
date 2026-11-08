@@ -126,7 +126,8 @@ trousseau > `OPENROUTER_API_KEY`. La clé n'est jamais écrite dans
    session ou `OPENROUTER_API_KEY`).
 3. **Fichier et prompt** : chemin, durée, prompt optionnel détecté et
    éditable.
-4. **Réglages** : modèle, langue, SRT/TXT, dossier de sortie.
+4. **Réglages** : modèle (liste stricte) avec coût estimé de la vidéo,
+   langue, SRT/TXT, dossier de sortie.
 5. **Progression** : phases, journal, annulation, erreurs inline.
 6. **Fin** : fichiers produits, coût, ouverture du dossier.
 

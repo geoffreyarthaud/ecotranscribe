@@ -1,5 +1,18 @@
 # Changelog
 
+## Non publié — 2026-11-08
+
+### Modifié
+
+- Interface condensée : titres de page retirés des étapes, accueil centré
+  verticalement, nom de fichier redondant retiré du prompt, paddings
+  verticaux des champs et boutons réduits.
+- Zone de prompt réduite d'environ 10 % pour afficher « Effacer le prompt »
+  sans barre de défilement à la taille de fenêtre par défaut.
+- Modèle présenté comme une liste stricte non éditable ; coût estimé de la
+  vidéo affiché à deux chiffres significatifs, avec virgule décimale
+  française et unité en fin de montant.
+
 ## 0.3.0 — 2026-11-06
 
 ### Modifié

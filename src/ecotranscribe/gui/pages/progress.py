@@ -42,7 +42,7 @@ class ProgressPage(WizardPage):
     change_file_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__("Transcription", parent)
+        super().__init__("Transcription", parent, show_title=False)
         self.alert: Alert | None = None
         self._busy = False
         self._writing = False

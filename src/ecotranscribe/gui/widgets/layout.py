@@ -16,13 +16,21 @@ from PySide6.QtWidgets import (
 
 
 class WizardPage(QWidget):
-    def __init__(self, title: str, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        title: str,
+        parent: QWidget | None = None,
+        *,
+        show_title: bool = True,
+    ) -> None:
         super().__init__(parent)
+        self.setAccessibleName(title)
         root = QVBoxLayout(self)
-        root.setContentsMargins(32, 24, 32, 24)
-        root.setSpacing(20)
+        root.setContentsMargins(32, 20, 32, 20)
+        root.setSpacing(16)
         self.title_label = QLabel(title)
         self.title_label.setProperty("role", "pageTitle")
+        self.title_label.setVisible(show_title)
         root.addWidget(self.title_label)
 
         scroll = QScrollArea()
@@ -64,12 +72,18 @@ class WizardPage(QWidget):
 
 
 class Section(QFrame):
-    def __init__(self, title: str, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        title: str,
+        parent: QWidget | None = None,
+        *,
+        spacing: int = 12,
+    ) -> None:
         super().__init__(parent)
         self.setProperty("role", "card")
         self._layout = QVBoxLayout(self)
-        self._layout.setContentsMargins(24, 20, 24, 20)
-        self._layout.setSpacing(12)
+        self._layout.setContentsMargins(24, 16, 24, 16)
+        self._layout.setSpacing(spacing)
         if title:
             label = QLabel(title)
             label.setProperty("role", "sectionTitle")

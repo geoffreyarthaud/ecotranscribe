@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 
 from ...core.config import OPENROUTER_MODEL, OPENROUTER_MODELS
 from ...core.models import OutputFormat
-from ...core.pricing import format_hourly_price
+from ...core.pricing import format_video_cost
 from ..state import WizardState
 from ..widgets.layout import Section, WizardPage
 
@@ -41,13 +41,14 @@ class SettingsPage(WizardPage):
     use_source_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__("Réglages", parent)
+        super().__init__("Réglages", parent, show_title=False)
         self._user_set = False
+        self._prices: dict[str, float] = {}
+        self._duration_s: float | None = None
 
         generation = Section("Modèle et langue")
         self.model_combo = QComboBox()
-        self.model_combo.setEditable(True)
-        self.model_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self.model_combo.setEditable(False)
         self.model_label = QLabel("Modèle")
         self.model_label.setProperty("role", "label")
         self.model_label.setBuddy(self.model_combo)
@@ -146,8 +147,9 @@ class SettingsPage(WizardPage):
         index = self._model_index(state.model)
         if index >= 0:
             self.model_combo.setCurrentIndex(index)
-        else:
-            self.model_combo.setEditText(state.model)
+        elif self.model_combo.count() > 0:
+            self.model_combo.setCurrentIndex(0)
+        self.set_duration(state.duration_s)
         language_index = self.language_combo.findData(state.language)
         if language_index < 0:
             language_index = 0
@@ -237,17 +239,28 @@ class SettingsPage(WizardPage):
             state.output_dir_user_set = False
 
     def set_price(self, model: str, price: float) -> None:
-        index = self._model_index(model)
-        if index < 0:
-            return
-        old_text = self.model_combo.itemText(index)
-        current_index = self.model_combo.currentIndex()
-        current_text = self.model_combo.currentText()
-        self.model_combo.setItemText(
-            index, f"{model} ({format_hourly_price(price)})"
+        self._prices[model] = price
+        self._refresh_model_costs()
+
+    def set_duration(self, seconds: float | None) -> None:
+        self._duration_s = (
+            float(seconds) if seconds is not None and seconds > 0 else None
         )
-        if current_index == index and current_text == old_text:
-            self.model_combo.setCurrentIndex(index)
+        self._refresh_model_costs()
+
+    def _refresh_model_costs(self) -> None:
+        for index in range(self.model_combo.count()):
+            model = self.model_combo.itemData(index)
+            if not isinstance(model, str) or not model:
+                continue
+            price = self._prices.get(model)
+            if price is None or self._duration_s is None:
+                self.model_combo.setItemText(index, model)
+            else:
+                self.model_combo.setItemText(
+                    index,
+                    f"{model} ({format_video_cost(price, self._duration_s)})",
+                )
 
     def set_output_dir(self, path: Path, *, user_set: bool = True) -> None:
         self._user_set = user_set
@@ -283,14 +296,8 @@ class SettingsPage(WizardPage):
         return -1
 
     def _current_model(self) -> str:
-        index = self.model_combo.currentIndex()
-        if index >= 0:
-            text = self.model_combo.currentText().strip()
-            if text == self.model_combo.itemText(index).strip():
-                data = self.model_combo.itemData(index)
-                if isinstance(data, str) and data:
-                    return data
-        return self.model_combo.currentText().strip()
+        data = self.model_combo.currentData()
+        return data if isinstance(data, str) else ""
 
     def _selected_formats(self) -> frozenset[OutputFormat]:
         formats = set()

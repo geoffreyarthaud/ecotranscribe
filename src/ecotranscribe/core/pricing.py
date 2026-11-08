@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from decimal import Decimal
 from typing import cast
 
 SECONDS_PER_HOUR = 3600.0
@@ -46,6 +47,14 @@ def parse_hourly_price(payload: object) -> float | None:
     return min(prices) * SECONDS_PER_HOUR
 
 
-def format_hourly_price(price: float) -> str:
-    """Formate un tarif horaire en dollars pour la liste des modèles."""
-    return f"≈ ${price:.2f}/h"
+def format_video_cost(hourly_price: float, duration_s: float) -> str:
+    """Estime le coût OpenRouter d'un média en dollars.
+
+    Le tarif est exprimé par heure d'audio. Le montant est arrondi à deux
+    chiffres significatifs et rendu avec la virgule décimale française.
+    """
+    cost = hourly_price * duration_s / SECONDS_PER_HOUR
+    text = format(cost, "#.2g")
+    if "e" in text or "E" in text:
+        text = format(Decimal(text), "f")
+    return f"≈ {text.replace('.', ',')} $"

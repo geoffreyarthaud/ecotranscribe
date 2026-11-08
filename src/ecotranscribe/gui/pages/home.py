@@ -18,8 +18,9 @@ class HomePage(WizardPage):
     options_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__("EcoTranscribe Desktop", parent)
-        self.title_label.setVisible(False)
+        super().__init__(
+            "EcoTranscribe Desktop", parent, show_title=False
+        )
         self.action_bar.setVisible(False)
         self._has_file = False
         subtitle = QLabel("Transcrire un fichier audio ou vidéo")
@@ -44,6 +45,7 @@ class HomePage(WizardPage):
         self.error_label.setWordWrap(True)
         self.error_label.setVisible(False)
 
+        self.content_layout.addStretch(1)
         self.content_layout.addWidget(subtitle)
         self.content_layout.addWidget(self.file_card)
         self.content_layout.addWidget(self.url_card)

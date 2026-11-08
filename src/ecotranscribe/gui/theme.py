@@ -99,7 +99,7 @@ _QSS = Template(
         padding: 2px 6px; border-radius: 0;
     }
     QPushButton {
-        min-height: 40px; padding: 7px 15px; border-radius: 0;
+        min-height: 32px; padding: 4px 14px; border-radius: 0;
         background: $surface; color: $primary; border: 2px solid $primary;
         font-weight: 500;
     }
@@ -144,21 +144,21 @@ _QSS = Template(
     }
     QToolButton[variant="tertiary"] {
         background: transparent; color: $primary; border: 2px solid transparent;
-        padding: 6px 10px; border-radius: 0; font-weight: 500;
+        padding: 4px 9px; border-radius: 0; font-weight: 500;
     }
     QToolButton[variant="tertiary"]:hover { background: $primary_soft; }
     QToolButton[variant="tertiary"]:focus { border-color: $focus; }
     QLineEdit, QComboBox, QPlainTextEdit {
         background: $surface; color: $text; border: 1px solid $border_strong;
-        border-radius: 0; padding: 8px 12px; min-height: 40px;
+        border-radius: 0; padding: 4px 12px; min-height: 30px;
         selection-background-color: $primary; selection-color: $on_primary;
     }
     QLineEdit:focus, QComboBox:focus, QPlainTextEdit:focus {
-        border: 2px solid $focus; padding: 7px 11px;
+        border: 2px solid $focus; padding: 3px 11px;
     }
     QLineEdit[state="error"], QComboBox[state="error"],
     QPlainTextEdit[state="error"] {
-        border: 2px solid $error; padding: 7px 11px;
+        border: 2px solid $error; padding: 3px 11px;
     }
     QLineEdit[role="path"] {
         background: transparent; border: 0; padding: 0;

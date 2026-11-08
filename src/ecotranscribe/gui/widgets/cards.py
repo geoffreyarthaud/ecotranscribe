@@ -34,7 +34,7 @@ class FileCard(QFrame):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setContentsMargins(24, 16, 24, 16)
         layout.setSpacing(12)
         self.title_label = QLabel(title)
         self.title_label.setProperty("role", "sectionTitle")
@@ -99,7 +99,7 @@ class DisabledCard(QFrame):
         self.setProperty("role", "card")
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setContentsMargins(24, 16, 24, 16)
         layout.setSpacing(8)
         row = QHBoxLayout()
         title_label = QLabel(title)

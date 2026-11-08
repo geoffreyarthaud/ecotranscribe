@@ -17,6 +17,13 @@ def test_wizard_page_exposes_title_and_actions(qtbot) -> None:
     assert secondary.isVisibleTo(page)
 
 
+def test_wizard_page_can_hide_title(qtbot) -> None:
+    page = WizardPage("Titre", show_title=False)
+    qtbot.addWidget(page)
+    assert page.title_label.isHidden()
+    assert page.accessibleName() == "Titre"
+
+
 def test_section_wraps_children(qtbot) -> None:
     section = Section("Section")
     label = QLabel("contenu")

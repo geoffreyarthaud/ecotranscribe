@@ -117,6 +117,21 @@ def test_prompt_detection_and_async_duration(qtbot, app_settings, tmp_path) -> N
     assert probe.paths == [source]
 
 
+def test_settings_page_cost_uses_video_duration(
+    qtbot, app_settings, tmp_path
+) -> None:
+    window, _service, _dialogs, _probe, _store = _window(
+        qtbot, app_settings, key="sk-or-secret", duration=3600.0
+    )
+    window.settings_page.set_price(OPENROUTER_MODEL, 0.24)
+    window.select_file(_source(tmp_path))
+    window.prompt_page.next_button.click()
+    qtbot.waitUntil(
+        lambda: "≈ 0,24 $" in window.settings_page.model_combo.currentText(),
+        timeout=2000,
+    )
+
+
 def test_back_history_skips_key_when_key_exists(qtbot, app_settings, tmp_path) -> None:
     window, _service, _dialogs, _probe, _store = _window(
         qtbot, app_settings, key="sk-or-secret"
@@ -296,7 +311,10 @@ def test_settings_are_captured_on_close(qtbot, tmp_path) -> None:
     )
     window.select_file(_source(tmp_path))
     window.prompt_page.next_button.click()
-    window.settings_page.model_combo.setEditText("custom/model")
+    window.settings_page.add_model("custom/model")
+    window.settings_page.model_combo.setCurrentIndex(
+        window.settings_page._model_index("custom/model")
+    )
     window.close()
     reloaded = AppSettings(
         QSettings(str(settings_path), QSettings.IniFormat)

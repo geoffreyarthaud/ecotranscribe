@@ -51,7 +51,8 @@ def test_settings_page_commits_values(qtbot, tmp_path) -> None:
     page = SettingsPage()
     qtbot.addWidget(page)
     page.load(state)
-    page.model_combo.setEditText("custom/model")
+    page.add_model("custom/model")
+    page.model_combo.setCurrentIndex(page._model_index("custom/model"))
     page.language_combo.setCurrentIndex(page.language_combo.findData(None))
     page.txt.setChecked(True)
     assert page.commit(state) is True
@@ -71,11 +72,23 @@ def test_settings_page_invalid_output_offers_source(qtbot, tmp_path) -> None:
     assert page.use_source.isVisibleTo(page)
 
 
-def test_settings_page_price_suffix(qtbot, tmp_path) -> None:
+def test_settings_page_shows_video_cost(qtbot, tmp_path) -> None:
     page = SettingsPage()
     qtbot.addWidget(page)
     page.load(_state(tmp_path))
-    page.set_price(OPENROUTER_MODEL, 1.5)
     index = page._model_index(OPENROUTER_MODEL)
     assert index >= 0
-    assert "1.50" in page.model_combo.itemText(index)
+    page.set_price(OPENROUTER_MODEL, 0.24)
+    page.set_duration(3600)
+    assert "≈ 0,24 $" in page.model_combo.itemText(index)
+    page.set_duration(3450)
+    assert "≈ 0,23 $" in page.model_combo.itemText(index)
+    page.set_duration(None)
+    assert "≈" not in page.model_combo.itemText(index)
+
+
+def test_settings_page_model_choice_is_strict(qtbot, tmp_path) -> None:
+    page = SettingsPage()
+    qtbot.addWidget(page)
+    page.load(_state(tmp_path))
+    assert page.model_combo.isEditable() is False

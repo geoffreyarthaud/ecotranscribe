@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from ecotranscribe.core.pricing import format_hourly_price, parse_hourly_price
+from ecotranscribe.core.pricing import format_video_cost, parse_hourly_price
 
 
 def test_parse_hourly_price_uses_cheapest_endpoint() -> None:
@@ -57,5 +57,16 @@ def test_parse_hourly_price_returns_none_without_data(
     assert parse_hourly_price(payload) is None
 
 
-def test_format_hourly_price() -> None:
-    assert format_hourly_price(0.24) == "≈ $0.24/h"
+@pytest.mark.parametrize(
+    ("hourly_price", "duration_s", "expected"),
+    [
+        (0.24, 3600.0, "≈ 0,24 $"),
+        (0.24, 3450.0, "≈ 0,23 $"),
+        (0.24, 0.615, "≈ 0,000041 $"),
+        (1.5, 3600.0, "≈ 1,5 $"),
+    ],
+)
+def test_format_video_cost(
+    hourly_price: float, duration_s: float, expected: str
+) -> None:
+    assert format_video_cost(hourly_price, duration_s) == expected
