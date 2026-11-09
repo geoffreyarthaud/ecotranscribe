@@ -7,7 +7,7 @@ from ecotranscribe.gui import app as app_module
 from ecotranscribe.gui.app import main
 
 DIAGNOSTIC = {
-    "app_version": "0.3.0",
+    "app_version": "0.4.0",
     "flavor": "desktop",
     "commit": "abc",
     "build_date": "2026-11-05T12:00:00Z",

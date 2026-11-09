@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "updated_at": "2026-11-09",
+  "models": [
+    "mistralai/voxtral-small-transcribe-3-0",
+    "mistralai/voxtral-mini-transcribe-3-0"
+  ]
+}

@@ -17,6 +17,7 @@ from ecotranscribe.gui.settings import AppSettings, MemoryStore
 from ecotranscribe.gui.state import PageId
 
 from .conftest import (
+    FakeCatalogClient,
     FakeDialogs,
     FakeDurationProbe,
     FakePricingClient,
@@ -54,6 +55,8 @@ def _window(
     service: FakeService | None = None,
     dialogs: FakeDialogs | None = None,
     store: MemoryStore | None = None,
+    catalog_client: FakeCatalogClient | None = None,
+    pricing_client: FakePricingClient | None = None,
 ):
     dialogs = dialogs or FakeDialogs()
     service = service or FakeService()
@@ -64,7 +67,8 @@ def _window(
         key_store=store,
         dialogs=dialogs,
         service_factory=lambda request: service,
-        pricing_client=FakePricingClient(),
+        pricing_client=pricing_client or FakePricingClient(),
+        catalog_client=catalog_client,
         duration_probe=probe,
     )
     qtbot.addWidget(window)
@@ -406,3 +410,60 @@ def test_old_provider_widgets_are_gone(qtbot, app_settings) -> None:
     assert not hasattr(window, "whisper_reason")
     assert not hasattr(window, "api_key_edit")
     assert not hasattr(window, "launch_button")
+
+
+def test_catalog_replaces_embedded_models(qtbot, app_settings, tmp_path) -> None:
+    catalog = FakeCatalogClient(("remote/one", "remote/two"))
+    pricing = FakePricingClient()
+    window, _service, _dialogs, _probe, _store = _window(
+        qtbot,
+        app_settings,
+        key="sk-or-secret",
+        catalog_client=catalog,
+        pricing_client=pricing,
+    )
+    window.select_file(_source(tmp_path))
+    window.prompt_page.next_button.click()
+
+    models = [
+        window.settings_page.model_combo.itemData(index)
+        for index in range(window.settings_page.model_combo.count())
+    ]
+    assert catalog.started == 1
+    assert "remote/one" in models
+    assert "remote/two" in models
+    assert "mistralai/voxtral-mini-transcribe-3-0" not in models
+    assert OPENROUTER_MODEL in models
+    assert "remote/one" in pricing.fetched
+    assert "remote/two" in pricing.fetched
+
+
+def test_late_catalog_preserves_current_model(
+    qtbot, app_settings, tmp_path
+) -> None:
+    catalog = FakeCatalogClient()
+    pricing = FakePricingClient()
+    window, _service, _dialogs, _probe, _store = _window(
+        qtbot,
+        app_settings,
+        key="sk-or-secret",
+        catalog_client=catalog,
+        pricing_client=pricing,
+    )
+    window.select_file(_source(tmp_path))
+    window.prompt_page.next_button.click()
+    window.settings_page.add_model("custom/model")
+    window.settings_page.model_combo.setCurrentIndex(
+        window.settings_page._model_index("custom/model")
+    )
+
+    catalog.emit(("remote/one", "remote/two"))
+
+    models = [
+        window.settings_page.model_combo.itemData(index)
+        for index in range(window.settings_page.model_combo.count())
+    ]
+    assert window.settings_page.model_combo.currentData() == "custom/model"
+    assert "remote/one" in models
+    assert "remote/two" in models
+    assert "remote/one" in pricing.fetched

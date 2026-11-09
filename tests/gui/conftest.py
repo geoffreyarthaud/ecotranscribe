@@ -8,6 +8,7 @@ from PySide6.QtCore import QObject, QSettings, QTimer, Signal
 
 from ecotranscribe.core.errors import CancelledError, TranscribeError
 from ecotranscribe.core.models import Provider, TranscribeResult
+from ecotranscribe.gui.catalog import CatalogClient
 from ecotranscribe.gui.pricing import PricingClient
 from ecotranscribe.gui.settings import AppSettings
 
@@ -76,6 +77,22 @@ class FakePricingClient(PricingClient):
 
     def fetch(self, model: str) -> None:
         self.fetched.append(model)
+
+
+class FakeCatalogClient(CatalogClient):
+    def __init__(self, models: tuple[str, ...] = ()) -> None:
+        super().__init__()
+        self.models = models
+        self.started = 0
+
+    def start(self) -> None:
+        self.started += 1
+        if self.models:
+            self.models_ready.emit(self.models)
+
+    def emit(self, models: tuple[str, ...]) -> None:
+        self.models = models
+        self.models_ready.emit(models)
 
 
 class FakeService:

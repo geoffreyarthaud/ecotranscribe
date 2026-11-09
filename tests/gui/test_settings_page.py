@@ -92,3 +92,52 @@ def test_settings_page_model_choice_is_strict(qtbot, tmp_path) -> None:
     qtbot.addWidget(page)
     page.load(_state(tmp_path))
     assert page.model_combo.isEditable() is False
+
+
+def test_settings_page_replaces_catalog_and_keeps_selection(
+    qtbot, tmp_path
+) -> None:
+    state = _state(tmp_path)
+    state.model = "legacy/model"
+    page = SettingsPage()
+    qtbot.addWidget(page)
+    page.load(state)
+
+    page.set_catalog(("catalog/one", "catalog/two"))
+
+    assert [
+        page.model_combo.itemData(index)
+        for index in range(page.model_combo.count())
+    ] == ["catalog/one", "catalog/two", "legacy/model"]
+    assert page.model_combo.currentData() == "legacy/model"
+
+
+def test_settings_page_catalog_keeps_cost_and_current_model(
+    qtbot, tmp_path
+) -> None:
+    state = _state(tmp_path)
+    state.model = "catalog/two"
+    page = SettingsPage()
+    qtbot.addWidget(page)
+    page.load(state)
+    page.set_price("catalog/two", 0.24)
+    page.set_duration(3600)
+
+    page.set_catalog(("catalog/one", "catalog/two"))
+
+    assert page.model_combo.currentData() == "catalog/two"
+    index = page._model_index("catalog/two")
+    assert "≈ 0,24 $" in page.model_combo.itemText(index)
+
+
+def test_settings_page_ignores_empty_catalog(qtbot, tmp_path) -> None:
+    state = _state(tmp_path)
+    page = SettingsPage()
+    qtbot.addWidget(page)
+    page.load(state)
+    before = page.model_combo.count()
+
+    page.set_catalog(())
+
+    assert page.model_combo.count() == before
+    assert page.model_combo.currentData() == OPENROUTER_MODEL

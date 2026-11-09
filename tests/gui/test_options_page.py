@@ -3,7 +3,7 @@ from __future__ import annotations
 from ecotranscribe.gui.pages.options import OptionsPage
 
 ABOUT = {
-    "version": "0.3.0",
+    "version": "0.4.0",
     "commit": "abc123",
     "build_date": "2026-11-06T10:00:00Z",
     "license": "MIT",
@@ -34,7 +34,7 @@ def test_options_page_about_and_delete(qtbot) -> None:
     page = OptionsPage()
     qtbot.addWidget(page)
     page.load("Clé enregistrée dans le trousseau", True, ABOUT, True)
-    assert "0.3.0" in page.about_label.text()
+    assert "0.4.0" in page.about_label.text()
     assert "MIT" in page.about_label.text()
     with qtbot.waitSignal(page.delete_key_requested):
         page.delete_button.click()

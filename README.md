@@ -36,6 +36,8 @@ conservé.
 - Progression par phase, pourcentage, position audio, temps écoulé et ETA.
 - Annulation avant l'écriture finale ; aucun fichier partiel.
 - Coût OpenRouter affiché à 6 décimales, ou « Coût indisponible ».
+- Catalogue de modèles actualisé depuis GitHub raw, avec cache local et repli
+  sur la liste embarquée.
 - Clé API dans le trousseau système, ou `OPENROUTER_API_KEY`.
 - Journal local rotatif (1 Mo × 3), sans clé ni audio.
 
@@ -126,8 +128,8 @@ trousseau > `OPENROUTER_API_KEY`. La clé n'est jamais écrite dans
    session ou `OPENROUTER_API_KEY`).
 3. **Fichier et prompt** : chemin, durée, prompt optionnel détecté et
    éditable.
-4. **Réglages** : modèle (liste stricte) avec coût estimé de la vidéo,
-   langue, SRT/TXT, dossier de sortie.
+4. **Réglages** : modèle (liste stricte, actualisée depuis le catalogue
+   public) avec coût estimé de la vidéo, langue, SRT/TXT, dossier de sortie.
 5. **Progression** : phases, journal, annulation, erreurs inline.
 6. **Fin** : fichiers produits, coût, ouverture du dossier.
 
@@ -176,9 +178,14 @@ En mode OpenRouter, **l'audio est envoyé à OpenRouter** ; le prompt l'est
 lorsque le modèle le supporte. N'utilisez pas cette édition pour des
 enregistrements que vous ne pouvez pas transmettre à un service tiers.
 
-L'application n'émet aucune requête réseau hors OpenRouter : pas de télémétrie,
-pas de vérification de mise à jour. Le coût cumulé `usage.cost` est affiché
-après la transcription. `0.0` est un coût valide ; le champ absent donne
+Au démarrage, l'application récupère le catalogue public
+`catalog/models.json` depuis GitHub raw. Cette requête ne contient ni audio,
+ni clé, ni identifiant utilisateur ; elle révèle l'adresse IP à GitHub comme
+toute requête HTTPS publique. Le dernier catalogue valide est mis en cache et
+la liste embarquée sert de repli hors ligne. Hors OpenRouter et ce catalogue,
+l'application n'émet aucune requête réseau : pas de télémétrie, pas de
+vérification de mise à jour. Le coût cumulé `usage.cost` est affiché après la
+transcription. `0.0` est un coût valide ; le champ absent donne
 « Coût indisponible ».
 
 ## Distribution
@@ -227,8 +234,8 @@ Sur macOS :
 
 ```bash
 bash packaging/sign_macos.sh "dist/EcoTranscribe Desktop.app"
-bash packaging/make_dmg.sh 0.3.0 arm64 "$(git rev-parse --short HEAD)" \
-  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" v0.3.0
+bash packaging/make_dmg.sh 0.4.0 arm64 "$(git rev-parse --short HEAD)" \
+  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" v0.4.0
 ```
 
 Windows : `packaging/make_windows.ps1` produit le ZIP portable et, si Inno
@@ -261,6 +268,7 @@ src/ecotranscribe/
 ├── core/          # modèles, erreurs, média, writers, service, moteurs
 ├── cli.py         # CLI rich
 └── gui/           # fenêtre PySide6, worker, settings, keyring, diagnostic
+catalog/           # catalogue public des modèles (GitHub raw)
 packaging/         # PyInstaller, ffmpeg épinglé, signature, DMG, Inno, AppImage
 tests/             # tests cœur, CLI, GUI et packaging
 docs/              # notice macOS, distribution, release notes

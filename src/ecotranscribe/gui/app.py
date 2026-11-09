@@ -14,6 +14,7 @@ from PySide6.QtWidgets import QApplication
 from ecotranscribe.core.config import APP_NAME, APP_SLUG
 from ecotranscribe.gui.app_icon import app_icon
 from ecotranscribe.gui.availability import collect_diagnostic
+from ecotranscribe.gui.catalog import GitHubCatalogClient
 from ecotranscribe.gui.dialogs import QtDialogService
 from ecotranscribe.gui.logging_setup import configure_logging
 from ecotranscribe.gui.main_window import MainWindow
@@ -77,6 +78,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         key_store=KeyringStore(),
         dialogs=QtDialogService(),
         pricing_client=OpenRouterPricingClient(),
+        catalog_client=GitHubCatalogClient(),
     )
     app.aboutToQuit.connect(window.save_settings)
     window.show()

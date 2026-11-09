@@ -111,9 +111,9 @@ Caractéristiques :
 ```bash
 bash packaging/sign_macos.sh "dist/EcoTranscribe Desktop.app"
 
-bash packaging/make_dmg.sh 0.3.0 arm64 \
+bash packaging/make_dmg.sh 0.4.0 arm64 \
   "$(git rev-parse --short HEAD)" \
-  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" v0.3.0
+  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" v0.4.0
 ```
 
 La signature est faite de l'intérieur vers l'extérieur :

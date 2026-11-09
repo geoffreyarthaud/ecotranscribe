@@ -2,7 +2,7 @@
 
 ## Versions prises en charge
 
-La version 0.3.x de l'application desktop reçoit les correctifs de sécurité.
+La version 0.4.x de l'application desktop reçoit les correctifs de sécurité.
 
 ## Binaires non notariés
 
@@ -22,14 +22,14 @@ vérifié.
 
 ```bash
 # macOS
-shasum -a 256 ecotranscribe-desktop-macos-arm64-0.3.0.dmg
+shasum -a 256 ecotranscribe-desktop-macos-arm64-0.4.0.dmg
 codesign --verify --deep --strict --verbose=2 "/Applications/EcoTranscribe Desktop.app"
 
 # Windows
-certutil -hashfile ecotranscribe-desktop-windows-x64-0.3.0.zip SHA256
+certutil -hashfile ecotranscribe-desktop-windows-x64-0.4.0.zip SHA256
 
 # Linux
-sha256sum ecotranscribe-desktop-linux-x64-0.3.0.AppImage
+sha256sum ecotranscribe-desktop-linux-x64-0.4.0.AppImage
 ```
 
 Comparez avec `SHA256SUMS.txt` de la même release. `spctl --assess` est rejeté
@@ -44,7 +44,10 @@ comme attendu pour un binaire non notarié.
   les détails d'erreur.
 - Le journal applicatif est local et rotatif (1 Mo × 3). Il peut contenir des
   chemins et des messages d'erreur, jamais l'audio ni la clé.
-- Aucune télémétrie, vérification de mise à jour ou requête hors OpenRouter.
+- Au démarrage, l'application récupère le catalogue public des modèles depuis
+  GitHub raw ; cette requête ne contient ni audio, ni clé, ni identifiant
+  utilisateur. Hors OpenRouter et ce catalogue, aucune requête réseau : pas de
+  télémétrie ni de vérification de mise à jour applicative.
 
 ## Signaler une vulnérabilité
 

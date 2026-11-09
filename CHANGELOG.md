@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.4.0 — 2026-11-09
+
+### Ajouté
+
+- Catalogue de modèles dynamique : `catalog/models.json` publié sur GitHub
+  raw, téléchargé au démarrage de l'application desktop, avec cache local et
+  repli sur la liste embarquée. Les modèles peuvent être ajoutés ou retirés
+  sans nouvelle release applicative.
+- Validation du catalogue : schéma `1`, identifiants uniques et sûrs, limite
+  de 50 modèles.
+- Les tarifs des modèles découverts dans le catalogue sont récupérés
+  automatiquement.
+
+### Modifié
+
+- L'invariant réseau autorise désormais le catalogue statique GitHub raw en
+  plus de l'API OpenRouter. Aucun audio ni secret n'est envoyé au catalogue.
+- Le modèle sélectionné et les modèles récents restent disponibles lorsqu'ils
+  disparaissent du catalogue.
+
 ## 0.3.0 — 2026-11-09
 
 ### Ajouté

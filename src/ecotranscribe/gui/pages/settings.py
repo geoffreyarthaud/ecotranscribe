@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable
 from pathlib import Path
 
 from PySide6.QtCore import Signal
@@ -282,6 +283,30 @@ class SettingsPage(WizardPage):
 
     def add_model(self, model: str) -> None:
         self._add_model(model)
+
+    def set_catalog(self, models: Iterable[str]) -> None:
+        """Remplace la liste par le catalogue distant.
+
+        Le modèle sélectionné est conservé même s'il a disparu du catalogue.
+        """
+        candidates = tuple(
+            model
+            for model in models
+            if isinstance(model, str) and model.strip()
+        )
+        if not candidates:
+            return
+        current = self._current_model()
+        self.model_combo.clear()
+        for model in candidates:
+            self._add_model(model)
+        self._add_model(current)
+        index = self._model_index(current)
+        if index >= 0:
+            self.model_combo.setCurrentIndex(index)
+        elif self.model_combo.count() > 0:
+            self.model_combo.setCurrentIndex(0)
+        self._refresh_model_costs()
 
     def _add_model(self, model: str) -> None:
         model = (model or "").strip()

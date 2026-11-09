@@ -1,9 +1,9 @@
 # Installer EcoTranscribe Desktop sur macOS (binaire non notarié)
 
-EcoTranscribe Desktop 0.3.0.
+EcoTranscribe Desktop 0.4.0.
 
-Version 0.3.0 — build CI
-Commit : voir la release `v0.3.0` (`SHA256SUMS.txt` et notes de release).
+Version 0.4.0 — build CI
+Commit : voir la release `v0.4.0` (`SHA256SUMS.txt` et notes de release).
 Source : <https://github.com/ecotranscribe/ecotranscribe>
 
 Cette application est open-source (MIT). Le binaire macOS est **signé
@@ -16,8 +16,8 @@ lancement.
 Selon votre Mac :
 
 ```text
-ecotranscribe-desktop-macos-arm64-0.3.0.dmg   # Apple Silicon
-ecotranscribe-desktop-macos-x64-0.3.0.dmg     # Intel
+ecotranscribe-desktop-macos-arm64-0.4.0.dmg   # Apple Silicon
+ecotranscribe-desktop-macos-x64-0.4.0.dmg     # Intel
 ```
 
 Les archives ZIP sont fournies en fallback.
@@ -45,7 +45,7 @@ Les archives ZIP sont fournies en fallback.
 Télécharger `SHA256SUMS.txt` depuis la release, puis :
 
 ```bash
-shasum -a 256 "ecotranscribe-desktop-macos-arm64-0.3.0.dmg"
+shasum -a 256 "ecotranscribe-desktop-macos-arm64-0.4.0.dmg"
 # comparer avec la ligne correspondante de SHA256SUMS.txt
 ```
 
@@ -70,7 +70,7 @@ nouvelle version téléchargée peut nécessiter à nouveau cette étape.
 
 - Code source et workflow de build publics :
   <https://github.com/ecotranscribe/ecotranscribe>
-- Le binaire est produit par GitHub Actions à partir du tag `v0.3.0`.
+- Le binaire est produit par GitHub Actions à partir du tag `v0.4.0`.
 - La release publie `SHA256SUMS.txt`.
 - Le bundle embarque `ffmpeg`/`ffprobe` ; aucun `ffmpeg` système ni Python
   n'est requis.
@@ -79,6 +79,8 @@ nouvelle version téléchargée peut nécessiter à nouveau cette étape.
 
 L'application desktop envoie l'audio à OpenRouter pour transcription. Le prompt est
 envoyé comme contexte lorsque le modèle le supporte (modèles Mistral).
+Au démarrage, elle récupère aussi le catalogue public des modèles depuis
+GitHub raw ; cette requête ne contient ni audio ni clé.
 N'utilisez pas cette édition pour des enregistrements que vous ne pouvez pas
 transmettre à un service tiers. La clé API est stockée dans le trousseau macOS
 si vous cochez « Mémoriser » ; sinon elle peut venir de

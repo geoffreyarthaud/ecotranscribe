@@ -22,8 +22,10 @@ explicitement validée.
 - **Application desktop** : pas de `torch`, pas d'`openai-whisper`, pas de modèle local.
   Whisper reste disponible uniquement via l'extra `[whisper]` et n'est jamais
   importé par l'application desktop.
-- **Réseau** : au runtime, seule l'API OpenRouter est contactée. Pas de
-  télémétrie, pas de vérification de mise à jour.
+- **Réseau** : au runtime, seules l'API OpenRouter et le catalogue statique
+  `catalog/models.json` (GitHub raw) sont contactés. Le catalogue ne transporte
+  ni audio, ni clé, ni identifiant utilisateur. Pas de télémétrie, pas de
+  vérification de mise à jour applicative.
 - **Secrets** : la clé OpenRouter ne doit apparaître ni dans les logs, ni dans
   `QSettings`, ni dans les détails d'erreur. Utiliser le keyring ou
   `OPENROUTER_API_KEY`.
@@ -47,8 +49,11 @@ explicitement validée.
 | `core/media.py` | ffmpeg/ffprobe, extraction, durée. |
 | `core/prompts.py`, `core/outputs.py`, `core/writers.py` | Prompt auto, chemins, rendu SRT/TXT. |
 | `core/config.py`, `core/errors.py`, `core/formatting.py` | Constantes, erreurs typées, formatage. |
+| `core/catalog.py` | Validation du catalogue public de modèles (schéma, identifiants). |
+| `catalog/models.json` | Catalogue public publié sur GitHub raw. |
 | `cli.py` | Adaptateur `argparse` + `rich`. |
 | `gui/` | Fenêtre PySide6, worker QThread, réglages, keyring, diagnostic, logs. |
+| `gui/catalog.py` | Téléchargement asynchrone et cache local du catalogue. |
 | `packaging/` | PyInstaller, ffmpeg épinglé, signatures, DMG/Inno/AppImage. |
 | `tests/` | Tests cœur, CLI, GUI et packaging ; goldens dans `tests/fixtures/`. |
 
@@ -105,7 +110,8 @@ uv run pyinstaller --noconfirm packaging/pyinstaller.spec
 ## Tests
 
 - Aucun test ne fait d'appel réseau réel ni ne charge un modèle Whisper.
-  Utiliser des faux moteurs, `monkeypatch` et des réponses fixture.
+  Utiliser des faux moteurs, `monkeypatch`, des réponses fixture et un faux
+  client de catalogue.
 - Tests GUI : `QSettings` temporaire, `KeyStore` en mémoire, `DialogService`
   factice ; lancer avec `QT_QPA_PLATFORM=offscreen` si nécessaire.
 - Toute correction de bug commence par un test qui échoue, puis passe.

@@ -45,7 +45,7 @@ def test_diagnostic_contains_documented_fields(
 
     diagnostic = collect_diagnostic()
 
-    assert diagnostic["app_version"] == "0.3.0"
+    assert diagnostic["app_version"] == "0.4.0"
     assert diagnostic["flavor"] == "desktop"
     assert diagnostic["commit"] == "abc123"
     assert diagnostic["build_date"] == "2026-11-05T12:00:00Z"

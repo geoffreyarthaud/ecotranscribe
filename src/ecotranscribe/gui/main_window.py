@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 
 from PySide6.QtCore import QSize, QThread, QUrl, Qt
@@ -51,6 +51,7 @@ from ..core.prompts import resolve_prompt
 from ..core.service import TranscribeService
 from .app_icon import app_icon_pixmap
 from .availability import build_info
+from .catalog import CatalogClient
 from .dialogs import DialogService
 from .duration import DurationProbe
 from .logging_setup import log_file_path
@@ -91,6 +92,7 @@ class MainWindow(QMainWindow):
         service_factory: Callable[[TranscribeRequest], TranscribeService]
         | None = None,
         pricing_client: PricingClient | None = None,
+        catalog_client: CatalogClient | None = None,
         duration_probe: DurationProbe | None = None,
         parent: QWidget | None = None,
     ) -> None:
@@ -100,6 +102,14 @@ class MainWindow(QMainWindow):
         self._dialogs = dialogs
         self._service_factory = service_factory or self._default_service
         self._pricing_client = pricing_client
+        self._catalog_client = catalog_client
+        if (
+            self._catalog_client is not None
+            and self._catalog_client.parent() is None
+        ):
+            self._catalog_client.setParent(self)
+        self._catalog_models: tuple[str, ...] | None = None
+        self._priced_models: set[str] = set()
         self._duration_probe = duration_probe or DurationProbe(parent=self)
         self._state = WizardState()
         self._history: list[PageId] = []
@@ -123,6 +133,8 @@ class MainWindow(QMainWindow):
         self._connect_signals()
         self._refresh_key_source()
         self._show_page(PageId.HOME, push=False)
+        if self._catalog_client is not None:
+            self._catalog_client.start()
 
     @property
     def state(self) -> WizardState:
@@ -241,6 +253,8 @@ class MainWindow(QMainWindow):
         self.options_page.back_requested.connect(self._back)
         self._duration_probe.ready.connect(self._on_duration_ready)
         self._duration_probe.failed.connect(self._on_duration_failed)
+        if self._catalog_client is not None:
+            self._catalog_client.models_ready.connect(self._on_catalog_ready)
         self._shortcuts: list[QShortcut] = []
         self._add_shortcut(QKeySequence.StandardKey.Open, self._browse_file)
         self._add_shortcut(QKeySequence("Ctrl+Return"), self._primary_shortcut)
@@ -260,8 +274,36 @@ class MainWindow(QMainWindow):
         if self._pricing_client.parent() is None:
             self._pricing_client.setParent(self)
         self._pricing_client.price_ready.connect(self.settings_page.set_price)
-        for model in OPENROUTER_MODELS:
+        self._fetch_prices(OPENROUTER_MODELS)
+        if self._catalog_models is not None:
+            self._fetch_prices(self._catalog_models)
+
+    def _fetch_prices(self, models: Iterable[object]) -> None:
+        if self._pricing_client is None:
+            return
+        for model in models:
+            if not isinstance(model, str) or model in self._priced_models:
+                continue
+            self._priced_models.add(model)
             self._pricing_client.fetch(model)
+
+    def _on_catalog_ready(self, models: object) -> None:
+        if not isinstance(models, (tuple, list)):
+            return
+        catalog = tuple(
+            model
+            for model in models
+            if isinstance(model, str) and model.strip()
+        )
+        if not catalog or catalog == self._catalog_models:
+            return
+        self._catalog_models = catalog
+        if self._settings_loaded:
+            self.settings_page.set_catalog(catalog)
+            for model in self._settings.recent_models:
+                self.settings_page.add_model(model)
+        if self._pricing_attached:
+            self._fetch_prices(catalog)
 
     def _restore_state(self) -> None:
         self._state.model = self._settings.model
@@ -651,6 +693,8 @@ class MainWindow(QMainWindow):
     def _open_settings(self) -> None:
         self._settings_loaded = True
         self.settings_page.load(self._state)
+        if self._catalog_models is not None:
+            self.settings_page.set_catalog(self._catalog_models)
         for model in self._settings.recent_models:
             self.settings_page.add_model(model)
         self._attach_pricing()

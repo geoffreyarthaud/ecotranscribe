@@ -15,9 +15,14 @@ WHISPER_OPTIONS: dict = {
 }
 
 OPENROUTER_MODEL = "mistralai/voxtral-small-transcribe-3-0"
+# Liste embarquée : repli hors ligne du catalogue distant.
 OPENROUTER_MODELS: tuple[str, ...] = (
     OPENROUTER_MODEL,
     "mistralai/voxtral-mini-transcribe-3-0",
+)
+MODELS_CATALOG_URL = (
+    "https://raw.githubusercontent.com/ecotranscribe/ecotranscribe/"
+    "main/catalog/models.json"
 )
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/audio/transcriptions"
 OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
