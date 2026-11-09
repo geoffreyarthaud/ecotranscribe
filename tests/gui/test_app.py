@@ -8,7 +8,7 @@ from ecotranscribe.gui.app import main
 
 DIAGNOSTIC = {
     "app_version": "0.3.0",
-    "flavor": "lite",
+    "flavor": "desktop",
     "commit": "abc",
     "build_date": "2026-11-05T12:00:00Z",
     "python": "3.13.3",
@@ -21,7 +21,7 @@ DIAGNOSTIC = {
     "ffmpeg_version": "ffmpeg version 9.0.2",
     "ffprobe_version": "ffprobe version 9.0.2",
     "whisper_available": False,
-    "whisper_reason": "non inclus dans l'édition lite",
+    "whisper_reason": "non inclus dans EcoTranscribe Desktop",
     "openrouter_model": "mistralai/voxtral-mini-transcribe-3-0",
     "config_dir": "/tmp/config",
     "log_file": "/tmp/config/ecotranscribe.log",
@@ -45,7 +45,7 @@ def test_diagnose_writes_json_without_window(
 
     assert result == 0
     payload = json.loads(output.read_text(encoding="utf-8"))
-    assert payload["flavor"] == "lite"
+    assert payload["flavor"] == "desktop"
     assert payload["whisper_available"] is False
     assert "app_version" in capsys.readouterr().out
 
@@ -71,7 +71,7 @@ def test_diagnose_writes_utf8(
 ) -> None:
     output = tmp_path / "diag.json"
     accent = dict(DIAGNOSTIC)
-    accent["whisper_reason"] = "édition lite — accentué"
+    accent["whisper_reason"] = "EcoTranscribe Desktop — accentué"
     monkeypatch.setattr(app_module, "collect_diagnostic", lambda: accent)
     monkeypatch.setattr(app_module, "configure_logging", lambda: tmp_path)
     main(["--diagnose", "--diagnose-output", str(output)])
@@ -83,7 +83,8 @@ def test_parser_rejects_unknown_option() -> None:
         main(["--unknown"])
 
 
-def test_parser_description_has_no_lite_or_provider() -> None:
+def test_parser_description_has_no_edition_or_provider() -> None:
     description = (app_module.build_parser().description or "").lower()
     assert "lite" not in description
+    assert "full" not in description
     assert "openrouter" not in description

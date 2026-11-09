@@ -26,7 +26,7 @@ Copy-Item (Join-Path $Root "LICENSE") $AppDir
 Copy-Item (Join-Path $Root "THIRD_PARTY_NOTICES.md") $AppDir
 Copy-Item (Join-Path $Root "packaging\notices") $AppDir -Recurse -Force
 
-$Zip = Join-Path $Dist "ecotranscribe-desktop-lite-windows-$Arch-$Version.zip"
+$Zip = Join-Path $Dist "ecotranscribe-desktop-windows-$Arch-$Version.zip"
 if (Test-Path $Zip) {
     Remove-Item -Force $Zip
 }
@@ -56,7 +56,7 @@ finally {
     $archive.Dispose()
 }
 
-$Setup = Join-Path $Dist "ecotranscribe-desktop-lite-windows-$Arch-$Version-setup.exe"
+$Setup = Join-Path $Dist "ecotranscribe-desktop-windows-$Arch-$Version-setup.exe"
 $isccCandidates = @(
     "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
     "$env:ProgramFiles\Inno Setup 6\ISCC.exe"

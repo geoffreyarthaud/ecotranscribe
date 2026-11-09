@@ -11,10 +11,10 @@ from ecotranscribe.gui.availability import (
 from ecotranscribe.core.config import OPENROUTER_MODEL
 
 
-def test_whisper_is_disabled_in_lite() -> None:
+def test_whisper_is_disabled_in_desktop() -> None:
     result = whisper_availability()
     assert result.available is False
-    assert "édition lite" in (result.reason or "")
+    assert "EcoTranscribe Desktop" in (result.reason or "")
 
 
 def test_openrouter_is_available() -> None:
@@ -46,7 +46,7 @@ def test_diagnostic_contains_documented_fields(
     diagnostic = collect_diagnostic()
 
     assert diagnostic["app_version"] == "0.3.0"
-    assert diagnostic["flavor"] == "lite"
+    assert diagnostic["flavor"] == "desktop"
     assert diagnostic["commit"] == "abc123"
     assert diagnostic["build_date"] == "2026-11-05T12:00:00Z"
     assert diagnostic["ffmpeg_path"] == "/bundle/ffmpeg"

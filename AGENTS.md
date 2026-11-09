@@ -19,9 +19,9 @@ explicitement validée.
 - **Sorties identiques** : CLI et GUI produisent les mêmes octets SRT/TXT via
   `core/writers.py`. UTF-8, fins de ligne LF, écriture atomique ; une annulation
   avant l'écriture finale ne laisse aucun fichier partiel.
-- **Édition lite** : pas de `torch`, pas d'`openai-whisper`, pas de modèle local.
+- **Application desktop** : pas de `torch`, pas d'`openai-whisper`, pas de modèle local.
   Whisper reste disponible uniquement via l'extra `[whisper]` et n'est jamais
-  importé par l'application lite.
+  importé par l'application desktop.
 - **Réseau** : au runtime, seule l'API OpenRouter est contactée. Pas de
   télémétrie, pas de vérification de mise à jour.
 - **Secrets** : la clé OpenRouter ne doit apparaître ni dans les logs, ni dans
@@ -134,7 +134,7 @@ uv run pyinstaller --noconfirm packaging/pyinstaller.spec
 
 - **Nouveau moteur** : implémenter `TranscriptionEngine`, ajouter la valeur dans
   `Provider`, enregistrer le moteur dans `cli.py` (et dans `gui/main_window.py`
-  seulement si le lite le supporte), puis tester disponibilité, erreurs et
+  seulement si l'application desktop le supporte), puis tester disponibilité, erreurs et
   sélection sans réseau.
 - **Nouveau format** : ajouter `OutputFormat`, le suffixe dans
   `core/outputs.py`, le rendu et l'écriture atomique dans `core/writers.py`,

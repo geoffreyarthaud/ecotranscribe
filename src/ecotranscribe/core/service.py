@@ -54,7 +54,7 @@ class TranscribeService:
         engine = self._engines.get(request.provider)
         if engine is None:
             raise EngineUnavailableError(
-                "Ce moteur n'est pas disponible dans cette édition lite."
+                "Ce moteur n'est pas disponible dans EcoTranscribe Desktop."
             )
         availability = engine.availability()
         if not availability.available:

@@ -37,8 +37,8 @@ uv run --project "$ROOT" python "$ROOT/packaging/render_notices.py" \
   --tag "$TAG" \
   --project-url "$PROJECT_URL"
 
-DMG="$DIST/ecotranscribe-desktop-lite-macos-$ARCH-$VERSION.dmg"
-ZIP="$DIST/ecotranscribe-desktop-lite-macos-$ARCH-$VERSION.zip"
+DMG="$DIST/ecotranscribe-desktop-macos-$ARCH-$VERSION.dmg"
+ZIP="$DIST/ecotranscribe-desktop-macos-$ARCH-$VERSION.zip"
 rm -f "$DMG" "$ZIP"
 
 hdiutil create \

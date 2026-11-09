@@ -1,4 +1,4 @@
-EcoTranscribe Desktop — édition lite
+EcoTranscribe Desktop — application desktop
 Version {version} — build {build_date}
 Source : {project_url}
 
@@ -9,7 +9,7 @@ INSTALLATION
 2. Si Windows affiche « Windows a protégé votre PC », cliquer sur
    « Informations complémentaires » puis « Exécuter quand même ».
 3. Vérifier l'intégrité :
-   certutil -hashfile "ecotranscribe-desktop-lite-windows-x64-{version}.zip" SHA256
+   certutil -hashfile "ecotranscribe-desktop-windows-x64-{version}.zip" SHA256
    comparer avec SHA256SUMS.txt, fourni avec la release.
 4. Lancer « EcoTranscribe Desktop.exe ».
 
@@ -18,5 +18,5 @@ ffmpeg/ffprobe : LGPLv2.1+ ; source et configuration dans
 THIRD_PARTY_NOTICES.md et le dépôt.
 
 DONNÉES
-L'édition lite envoie l'audio à OpenRouter pour transcription. Le prompt est
+L'application desktop envoie l'audio à OpenRouter pour transcription. Le prompt est
 envoyé comme contexte lorsque le modèle le supporte (modèles Mistral).

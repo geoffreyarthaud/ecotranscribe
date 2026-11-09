@@ -1,6 +1,6 @@
-# Distribution et build — EcoTranscribe Desktop lite
+# Distribution et build — EcoTranscribe Desktop
 
-Ce guide décrit le build local et la release GitHub de l'édition lite.
+Ce guide décrit le build local et la release GitHub de l'application desktop.
 
 ## Cibles
 
@@ -14,14 +14,14 @@ Ce guide décrit le build local et la release GitHub de l'édition lite.
 Noms :
 
 ```text
-ecotranscribe-desktop-lite-macos-arm64-<version>.dmg
-ecotranscribe-desktop-lite-macos-arm64-<version>.zip
-ecotranscribe-desktop-lite-macos-x64-<version>.dmg
-ecotranscribe-desktop-lite-macos-x64-<version>.zip
-ecotranscribe-desktop-lite-windows-x64-<version>.zip
-ecotranscribe-desktop-lite-windows-x64-<version>-setup.exe
-ecotranscribe-desktop-lite-linux-x64-<version>.AppImage
-ecotranscribe-desktop-lite-linux-x64-<version>.tar.gz
+ecotranscribe-desktop-macos-arm64-<version>.dmg
+ecotranscribe-desktop-macos-arm64-<version>.zip
+ecotranscribe-desktop-macos-x64-<version>.dmg
+ecotranscribe-desktop-macos-x64-<version>.zip
+ecotranscribe-desktop-windows-x64-<version>.zip
+ecotranscribe-desktop-windows-x64-<version>-setup.exe
+ecotranscribe-desktop-linux-x64-<version>.AppImage
+ecotranscribe-desktop-linux-x64-<version>.tar.gz
 SHA256SUMS.txt
 ```
 
@@ -100,7 +100,7 @@ Caractéristiques :
 - nom `EcoTranscribe Desktop`, bundle `app.ecotranscribe.desktop` ;
 - `bin/ffmpeg` et `bin/ffprobe` embarqués ;
 - `LICENSE`, `THIRD_PARTY_NOTICES.md`, `README.md` et `notices/` inclus ;
-- exclusions lite : `whisper`, `torch`, `torchaudio`, `torchvision`, `numba`,
+- exclusions : : `whisper`, `torch`, `torchaudio`, `torchvision`, `numba`,
   `tiktoken`, `triton`, `tensorboard`, `pytest`, `tkinter` ;
 - `ecotranscribe_build_info` généré dans `build/generated/` avec commit et
   date ;
@@ -207,7 +207,7 @@ QT_QPA_PLATFORM=offscreen "/tmp/eco-tar/EcoTranscribe Desktop/EcoTranscribe Desk
 
 ## CI et release
 
-`.github/workflows/build-lite.yml` :
+`.github/workflows/build.yml` :
 
 - déclencheurs : tags `v*`, `workflow_dispatch` ;
 - tests `uv run pytest` sur chaque OS, avec `QT_QPA_PLATFORM=offscreen` ;
@@ -238,7 +238,7 @@ Aucun secret n'est requis pour construire les artefacts.
       attendu, DMG avec notice/licences/lien Applications.
 - [ ] Windows : ZIP s'extrait, l'exe se lance sans console, diagnostic OK.
 - [ ] Linux : AppImage se lance avec `--appimage-extract-and-run`, tar.gz OK.
-- [ ] Diagnostic `flavor=lite`, `whisper_available=false`, chemins ffmpeg
+- [ ] Diagnostic `flavor=desktop`, `whisper_available=false`, chemins ffmpeg
       dans le bundle.
 - [ ] Tailles : app ≤ 600 Mo (macOS reste sous 450 Mo), artefact
       compressé ≤ 300 Mo. Les builds BtbN Windows/Linux embarquent

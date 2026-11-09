@@ -1,4 +1,4 @@
-name: build-lite
+name: build
 
 on:
   push:
@@ -48,7 +48,7 @@ jobs:
       - name: Install Python
         run: uv python install 3.13
 
-      - name: Install lite and test dependencies
+      - name: Install app and test dependencies
         run: uv sync --extra gui --extra dev
 
       - name: Check version alignment
@@ -223,7 +223,7 @@ jobs:
             done
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Verify lite contents and size
+      - name: Verify app contents and size
         shell: bash
         run: |
           uv run python - <<'PY'
@@ -240,7 +240,7 @@ jobs:
           size_mb = sum(p.stat().st_size for p in app.rglob("*") if p.is_file()) / 1_000_000
           # Les builds BtbN Windows/Linux embarquent ffmpeg+ffprobe complets.
           assert size_mb <= 600, f"app trop grande : {size_mb:.1f} Mo"
-          for artifact in Path("dist").glob("ecotranscribe-desktop-lite-*"):
+          for artifact in Path("dist").glob("ecotranscribe-desktop-*"):
               assert artifact.stat().st_size <= 300_000_000, artifact
           print(f"app {size_mb:.1f} Mo, artefacts OK")
           PY
@@ -249,33 +249,33 @@ jobs:
         if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
-          name: ecotranscribe-lite-${{ matrix.target }}
+          name: ecotranscribe-build-${{ matrix.target }}
           if-no-files-found: error
           path: |
-            dist/ecotranscribe-desktop-lite-macos-${{ matrix.arch }}-*.dmg
-            dist/ecotranscribe-desktop-lite-macos-${{ matrix.arch }}-*.zip
+            dist/ecotranscribe-desktop-macos-${{ matrix.arch }}-*.dmg
+            dist/ecotranscribe-desktop-macos-${{ matrix.arch }}-*.zip
             dist/SHA256SUMS-macos-${{ matrix.arch }}.txt
 
       - name: Upload Windows artifacts
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: ecotranscribe-lite-${{ matrix.target }}
+          name: ecotranscribe-build-${{ matrix.target }}
           if-no-files-found: error
           path: |
-            dist/ecotranscribe-desktop-lite-windows-${{ matrix.arch }}-*.zip
-            dist/ecotranscribe-desktop-lite-windows-${{ matrix.arch }}-*-setup.exe
+            dist/ecotranscribe-desktop-windows-${{ matrix.arch }}-*.zip
+            dist/ecotranscribe-desktop-windows-${{ matrix.arch }}-*-setup.exe
             dist/SHA256SUMS-windows-${{ matrix.arch }}.txt
 
       - name: Upload Linux artifacts
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
-          name: ecotranscribe-lite-${{ matrix.target }}
+          name: ecotranscribe-build-${{ matrix.target }}
           if-no-files-found: error
           path: |
-            dist/ecotranscribe-desktop-lite-linux-${{ matrix.arch }}-*.AppImage
-            dist/ecotranscribe-desktop-lite-linux-${{ matrix.arch }}-*.tar.gz
+            dist/ecotranscribe-desktop-linux-${{ matrix.arch }}-*.AppImage
+            dist/ecotranscribe-desktop-linux-${{ matrix.arch }}-*.tar.gz
             dist/SHA256SUMS-linux-${{ matrix.arch }}.txt
 
   release:
@@ -291,7 +291,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: release
-          pattern: ecotranscribe-lite-*
+          pattern: ecotranscribe-build-*
           merge-multiple: true
 
       - name: Build SHA256SUMS.txt

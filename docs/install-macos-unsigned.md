@@ -1,6 +1,6 @@
 # Installer EcoTranscribe Desktop sur macOS (binaire non notarié)
 
-EcoTranscribe Desktop 0.3.0 — édition lite.
+EcoTranscribe Desktop 0.3.0.
 
 Version 0.3.0 — build CI
 Commit : voir la release `v0.3.0` (`SHA256SUMS.txt` et notes de release).
@@ -16,8 +16,8 @@ lancement.
 Selon votre Mac :
 
 ```text
-ecotranscribe-desktop-lite-macos-arm64-0.3.0.dmg   # Apple Silicon
-ecotranscribe-desktop-lite-macos-x64-0.3.0.dmg     # Intel
+ecotranscribe-desktop-macos-arm64-0.3.0.dmg   # Apple Silicon
+ecotranscribe-desktop-macos-x64-0.3.0.dmg     # Intel
 ```
 
 Les archives ZIP sont fournies en fallback.
@@ -45,7 +45,7 @@ Les archives ZIP sont fournies en fallback.
 Télécharger `SHA256SUMS.txt` depuis la release, puis :
 
 ```bash
-shasum -a 256 "ecotranscribe-desktop-lite-macos-arm64-0.3.0.dmg"
+shasum -a 256 "ecotranscribe-desktop-macos-arm64-0.3.0.dmg"
 # comparer avec la ligne correspondante de SHA256SUMS.txt
 ```
 
@@ -77,7 +77,7 @@ nouvelle version téléchargée peut nécessiter à nouveau cette étape.
 
 ## Données
 
-L'édition lite envoie l'audio à OpenRouter pour transcription. Le prompt est
+L'application desktop envoie l'audio à OpenRouter pour transcription. Le prompt est
 envoyé comme contexte lorsque le modèle le supporte (modèles Mistral).
 N'utilisez pas cette édition pour des enregistrements que vous ne pouvez pas
 transmettre à un service tiers. La clé API est stockée dans le trousseau macOS

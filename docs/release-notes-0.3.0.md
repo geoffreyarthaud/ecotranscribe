@@ -1,14 +1,14 @@
-## EcoTranscribe Desktop 0.3.0 — édition lite
+## EcoTranscribe Desktop 0.3.0
 
 Application desktop OpenRouter pour macOS, Windows et Linux.
 
 ### Téléchargements
 
-- macOS arm64 : `ecotranscribe-desktop-lite-macos-arm64-0.3.0.dmg` / `.zip`
-- macOS x64 : `ecotranscribe-desktop-lite-macos-x64-0.3.0.dmg` / `.zip`
-- Windows x64 : `ecotranscribe-desktop-lite-windows-x64-0.3.0.zip`
+- macOS arm64 : `ecotranscribe-desktop-macos-arm64-0.3.0.dmg` / `.zip`
+- macOS x64 : `ecotranscribe-desktop-macos-x64-0.3.0.dmg` / `.zip`
+- Windows x64 : `ecotranscribe-desktop-windows-x64-0.3.0.zip`
   (installeur `.exe` optionnel)
-- Linux x64 : `ecotranscribe-desktop-lite-linux-x64-0.3.0.AppImage` / `.tar.gz`
+- Linux x64 : `ecotranscribe-desktop-linux-x64-0.3.0.AppImage` / `.tar.gz`
 
 ### Installation macOS
 
@@ -29,9 +29,9 @@ Ne désactivez pas Gatekeeper globalement.
 l'ouvrir :
 
 ```bash
-shasum -a 256 ecotranscribe-desktop-lite-macos-arm64-0.3.0.dmg
-sha256sum ecotranscribe-desktop-lite-linux-x64-0.3.0.AppImage
-certutil -hashfile ecotranscribe-desktop-lite-windows-x64-0.3.0.zip SHA256
+shasum -a 256 ecotranscribe-desktop-macos-arm64-0.3.0.dmg
+sha256sum ecotranscribe-desktop-linux-x64-0.3.0.AppImage
+certutil -hashfile ecotranscribe-desktop-windows-x64-0.3.0.zip SHA256
 ```
 
 ### Nouveautés 0.3.0
@@ -49,6 +49,6 @@ certutil -hashfile ecotranscribe-desktop-lite-windows-x64-0.3.0.zip SHA256
 
 ### Données
 
-L'édition lite envoie l'audio à OpenRouter ; le prompt est envoyé comme
+L'application desktop envoie l'audio à OpenRouter ; le prompt est envoyé comme
 contexte lorsque le modèle le supporte. La clé API est stockée dans le
 trousseau du système si vous cochez « Mémoriser ».

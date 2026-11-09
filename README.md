@@ -3,10 +3,10 @@
 Transcription audio et vidéo avec **OpenRouter** (cloud) ou **Whisper** (local),
 en application desktop ou en ligne de commande.
 
-EcoTranscribe existe en deux éditions :
+EcoTranscribe existe sous deux formes :
 
-- **lite** : application desktop OpenRouter, sans Python, sans `ffmpeg` système
-  et sans Whisper local ;
+- **Application desktop** : OpenRouter, sans Python, sans `ffmpeg` système et
+  sans Whisper local ;
 - **CLI** : `ecotranscribe`, pour les développeurs, avec OpenRouter ou Whisper
   local via l'extra `[whisper]`.
 
@@ -43,7 +43,7 @@ conservé.
 
 | Usage | Prérequis |
 |---|---|
-| Application desktop lite | macOS 12+, Windows 10 21H2+/11 x64, Ubuntu 22.04+ x64 |
+| Application desktop | macOS 12+, Windows 10 21H2+/11 x64, Ubuntu 22.04+ x64 |
 | CLI | Python ≥ 3.13, [uv](https://docs.astral.sh/uv/) |
 | Moteur Whisper local | `uv sync --extra whisper` |
 | Développement | `ffmpeg` et `ffprobe` dans le `PATH` (ou l'override ci-dessous) |
@@ -62,7 +62,7 @@ sudo apt install ffmpeg
 ## Installation
 
 ```bash
-# Application desktop lite (OpenRouter uniquement)
+# Application desktop (OpenRouter uniquement)
 uv sync --extra gui
 uv run ecotranscribe-desktop
 
@@ -74,11 +74,11 @@ uv run ecotranscribe --provider openrouter fichier.mp4
 uv sync --extra whisper
 uv run ecotranscribe fichier.mp3
 
-# Installation complète pour le futur build full
+# GUI et Whisper local (développement)
 uv sync --extra gui --extra whisper
 ```
 
-L'application lite n'installe ni `torch`, ni `openai-whisper`, ni modèle local.
+L'application desktop n'installe ni `torch`, ni `openai-whisper`, ni modèle local.
 Le moteur Whisper du CLI est désormais optionnel : sans l'extra `[whisper]`,
 `ecotranscribe --provider whisper` affiche :
 
@@ -269,7 +269,7 @@ docs/              # notice macOS, distribution, release notes
 ## Compatibilité macOS
 
 `PySide6-Essentials` est borné à `< 6.10` (6.9.3) : les versions 6.10+ exigent
-macOS 13 ou 14 selon les wheels, alors que l'édition lite cible macOS 12+.
+macOS 13 ou 14 selon les wheels, alors que l'application desktop cible macOS 12+.
 Cette borne est nécessaire pour `macos-15-intel` et macOS 12.
 
 ## Licence

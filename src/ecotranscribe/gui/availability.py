@@ -14,7 +14,7 @@ from ..core.config import (
     FLAVOR,
     OPENROUTER_MODEL,
     PROJECT_URL,
-    WHISPER_LITE_REASON,
+    WHISPER_DESKTOP_REASON,
 )
 from ..core.media import resolve_tool, tool_version
 from ..core.models import EngineAvailability
@@ -30,11 +30,11 @@ _DEFAULT_BUILD_DATE = getattr(_build_info, "BUILD_DATE", "")
 
 
 def whisper_availability() -> EngineAvailability:
-    """Whisper n'est jamais inclus dans l'édition lite."""
+    """Whisper n'est jamais inclus dans EcoTranscribe Desktop."""
     return EngineAvailability(
         False,
-        WHISPER_LITE_REASON,
-        detail="L'édition lite ne contient ni torch ni openai-whisper.",
+        WHISPER_DESKTOP_REASON,
+        detail="EcoTranscribe Desktop ne contient ni torch ni openai-whisper.",
     )
 
 
@@ -88,7 +88,7 @@ def collect_diagnostic() -> dict:
             tool_version(ffprobe_path) if ffprobe_path else None
         ),
         "whisper_available": False,
-        "whisper_reason": WHISPER_LITE_REASON,
+        "whisper_reason": WHISPER_DESKTOP_REASON,
         "openrouter_model": OPENROUTER_MODEL,
         "config_dir": str(config_dir()),
         "log_file": str(log_file_path()),

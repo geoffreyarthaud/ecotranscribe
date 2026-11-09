@@ -1,4 +1,4 @@
-EcoTranscribe Desktop — édition lite
+EcoTranscribe Desktop
 Version {version} — build {build_date}
 Commit : {commit}
 Source : {project_url}
@@ -17,7 +17,7 @@ INSTALLATION
    - Sur macOS 12 à 14, un clic droit sur l'application puis « Ouvrir »
      fonctionne généralement.
 3. Vérifier l'intégrité :
-   shasum -a 256 "ecotranscribe-desktop-lite-macos-{arch}-{version}.dmg"
+   shasum -a 256 "ecotranscribe-desktop-macos-{arch}-{version}.dmg"
    comparer avec SHA256SUMS.txt, fourni avec la release.
 4. Lancer l'application.
 
@@ -35,7 +35,7 @@ SÉCURITÉ
 - Chaque nouvelle version téléchargée peut nécessiter à nouveau l'étape 2.
 
 DONNÉES
-L'édition lite envoie l'audio à OpenRouter pour transcription. Le prompt est
+L'application desktop envoie l'audio à OpenRouter pour transcription. Le prompt est
 envoyé comme contexte lorsque le modèle le supporte (modèles Mistral).
 N'utilisez pas cette édition pour des enregistrements que vous ne pouvez pas
 transmettre à un service tiers. La clé API est stockée dans le trousseau macOS

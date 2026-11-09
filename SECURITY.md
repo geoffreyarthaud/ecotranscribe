@@ -2,7 +2,7 @@
 
 ## Versions prises en charge
 
-La version 0.3.x de l'édition lite reçoit les correctifs de sécurité.
+La version 0.3.x de l'application desktop reçoit les correctifs de sécurité.
 
 ## Binaires non notariés
 
@@ -22,14 +22,14 @@ vérifié.
 
 ```bash
 # macOS
-shasum -a 256 ecotranscribe-desktop-lite-macos-arm64-0.3.0.dmg
+shasum -a 256 ecotranscribe-desktop-macos-arm64-0.3.0.dmg
 codesign --verify --deep --strict --verbose=2 "/Applications/EcoTranscribe Desktop.app"
 
 # Windows
-certutil -hashfile ecotranscribe-desktop-lite-windows-x64-0.3.0.zip SHA256
+certutil -hashfile ecotranscribe-desktop-windows-x64-0.3.0.zip SHA256
 
 # Linux
-sha256sum ecotranscribe-desktop-lite-linux-x64-0.3.0.AppImage
+sha256sum ecotranscribe-desktop-linux-x64-0.3.0.AppImage
 ```
 
 Comparez avec `SHA256SUMS.txt` de la même release. `spctl --assess` est rejeté
@@ -37,7 +37,7 @@ comme attendu pour un binaire non notarié.
 
 ## Données et secrets
 
-- L'édition lite envoie l'audio à OpenRouter pour transcription. Le prompt est
+- L'application desktop envoie l'audio à OpenRouter pour transcription. Le prompt est
   envoyé comme contexte lorsque le modèle le supporte (Mistral).
 - La clé OpenRouter est lue depuis le trousseau système ou
   `OPENROUTER_API_KEY`. Elle n'est jamais écrite dans `QSettings`, les logs ou

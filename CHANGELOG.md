@@ -12,6 +12,8 @@
 
 ### Modifié
 
+- Artefacts renommés en `ecotranscribe-desktop-*` ; suppression de la
+  notion d'édition dans le nommage et le diagnostic.
 - Packaging : ffmpeg/ffprobe macOS compilés depuis FFmpeg 9.0.2 et LAME
   3.100 en LGPLv2.1+, avec les seuls composants utilisés par EcoTranscribe ;
   licence uniforme macOS/Windows/Linux, sans composant GPL.
@@ -35,7 +37,7 @@
 - Thème Qt inspiré des principes du DSFR (non officiel), clair/sombre, sans
   police, code, logo ni asset DSFR.
 - Suppression du sélecteur de fournisseur, de la mention Whisper et du badge
-  d'édition lite dans l'interface.
+  d'édition dans l'interface.
 - La clé mémorisée n'est plus préremplie ; les réglages non secrets sont
   conservés à la fermeture ; `ui/log_visible` est supprimé.
 - Bouton Options remplacé par une icône de roue dentée dans l'en-tête ;
@@ -55,8 +57,8 @@
 
 ### Ajouté
 
-- Application desktop **EcoTranscribe Desktop** (PySide6, édition lite
-  OpenRouter) avec drag & drop, prompt auto-détecté, réglages persistants,
+- Application desktop **EcoTranscribe Desktop** (PySide6, OpenRouter) avec
+  drag & drop, prompt auto-détecté, réglages persistants,
   keyring, progression détaillée, annulation, coût et journal rotatif.
 - Entrée `ecotranscribe-desktop` et mode `--diagnose`.
 - Writers SRT/TXT internes, atomiques, UTF-8/LF, identiques aux sorties du CLI.

@@ -1,4 +1,4 @@
-# Third-party notices — EcoTranscribe Desktop lite
+# Third-party notices — EcoTranscribe Desktop
 
 EcoTranscribe est distribué sous licence MIT (voir `LICENSE`). Les composants
 suivants sont embarqués dans les artefacts binaires.

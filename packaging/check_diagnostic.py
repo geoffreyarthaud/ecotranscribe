@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Vérifie le JSON --diagnose d'un artefact lite."""
+"""Vérifie le JSON --diagnose d'un artefact desktop."""
 
 from __future__ import annotations
 
@@ -39,8 +39,8 @@ def main(argv: list[str] | None = None) -> int:
     missing = REQUIRED - data.keys()
     if missing:
         raise SystemExit(f"Champs manquants : {sorted(missing)}")
-    if data["flavor"] != "lite":
-        raise SystemExit("flavor différent de lite")
+    if data["flavor"] != "desktop":
+        raise SystemExit("flavor différent de desktop")
     if data["frozen"] is not True:
         raise SystemExit("l'artefact n'est pas gelé")
     if data["whisper_available"] is not False:

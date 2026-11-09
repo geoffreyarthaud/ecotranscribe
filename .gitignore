@@ -50,7 +50,7 @@ vendor/
 *.zip
 *.tar.gz
 SHA256SUMS*.txt
-ecotranscribe-desktop-lite-*
+ecotranscribe-desktop-*
 packaging/build/
 
 # PyTest

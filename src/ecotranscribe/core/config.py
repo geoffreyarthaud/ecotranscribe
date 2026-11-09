@@ -4,7 +4,7 @@ from __future__ import annotations
 
 APP_NAME = "EcoTranscribe Desktop"
 APP_SLUG = "ecotranscribe"
-FLAVOR = "lite"
+FLAVOR = "desktop"
 PROJECT_URL = "https://github.com/ecotranscribe/ecotranscribe"
 
 WHISPER_MODEL = "medium"
@@ -74,8 +74,8 @@ VIDEO_EXTENSIONS: frozenset[str] = frozenset(
 WHISPER_NOT_INSTALLED_MESSAGE = (
     "Moteur Whisper non installé. Lancez `uv sync --extra whisper`."
 )
-WHISPER_LITE_REASON = (
-    "Moteur Whisper local non inclus dans l'édition lite."
+WHISPER_DESKTOP_REASON = (
+    "Moteur Whisper local non inclus dans EcoTranscribe Desktop."
 )
 KEY_MISSING_MESSAGE = (
     "Clé OpenRouter manquante. Saisissez-la ou définissez OPENROUTER_API_KEY."
