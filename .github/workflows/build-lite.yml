@@ -238,7 +238,8 @@ jobs:
           ]
           assert not bad, f"torch/whisper détecté : {bad[:5]}"
           size_mb = sum(p.stat().st_size for p in app.rglob("*") if p.is_file()) / 1_000_000
-          assert size_mb <= 450, f"app trop grande : {size_mb:.1f} Mo"
+          # Les builds BtbN Windows/Linux embarquent ffmpeg+ffprobe complets.
+          assert size_mb <= 600, f"app trop grande : {size_mb:.1f} Mo"
           for artifact in Path("dist").glob("ecotranscribe-desktop-lite-*"):
               assert artifact.stat().st_size <= 300_000_000, artifact
           print(f"app {size_mb:.1f} Mo, artefacts OK")

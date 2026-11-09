@@ -240,7 +240,9 @@ Aucun secret n'est requis pour construire les artefacts.
 - [ ] Linux : AppImage se lance avec `--appimage-extract-and-run`, tar.gz OK.
 - [ ] Diagnostic `flavor=lite`, `whisper_available=false`, chemins ffmpeg
       dans le bundle.
-- [ ] Tailles : app ≤ 450 Mo, artefact compressé ≤ 300 Mo.
+- [ ] Tailles : app ≤ 600 Mo (macOS reste sous 450 Mo), artefact
+      compressé ≤ 300 Mo. Les builds BtbN Windows/Linux embarquent
+      ffmpeg+ffprobe complets (~270 Mo).
 - [ ] `SHA256SUMS.txt` couvre tous les assets.
 - [ ] Tag `v<version>` == version paquet == `pyproject.toml`, et
       `docs/release-notes-<version>.md` présent.
