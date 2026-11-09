@@ -44,11 +44,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--os", dest="platform", required=True, choices=PLATFORMS)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--version", default="0.2.0")
+    parser.add_argument("--version", default="0.3.0")
     parser.add_argument("--arch", default="")
     parser.add_argument("--commit", default="dev")
     parser.add_argument("--build-date", default="")
-    parser.add_argument("--tag", default="v0.2.0")
+    parser.add_argument("--tag", default="v0.3.0")
     parser.add_argument(
         "--project-url",
         default="https://github.com/ecotranscribe/ecotranscribe",

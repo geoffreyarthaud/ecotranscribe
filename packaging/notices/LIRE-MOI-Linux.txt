@@ -12,3 +12,7 @@ INSTALLATION
 4. Vérifier l'intégrité :
    sha256sum ecotranscribe-desktop-lite-linux-x64-{version}.AppImage
    comparer avec SHA256SUMS.txt, fourni avec la release.
+
+LICENCES
+ffmpeg/ffprobe : LGPLv2.1+ ; source et configuration dans
+THIRD_PARTY_NOTICES.md et le dépôt.

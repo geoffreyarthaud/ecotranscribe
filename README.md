@@ -211,8 +211,10 @@ de vérification SHA256 sont incluses dans les artefacts.
 # Préparer l'environnement de build
 uv sync --extra gui --extra dev
 
-# Télécharger ffmpeg/ffprobe épinglés et vérifiés par SHA256
-uv run python packaging/fetch_ffmpeg.py --target darwin-arm64
+# macOS : compiler ffmpeg/ffprobe LGPL depuis les sources épinglées
+uv run python packaging/build_ffmpeg_source.py --target darwin-arm64
+# Windows/Linux : récupérer le binaire LGPL précompilé, vérifié par SHA256
+uv run python packaging/fetch_ffmpeg.py --target win-x64
 
 # Icônes
 uv run python packaging/make_icons.py
@@ -225,8 +227,8 @@ Sur macOS :
 
 ```bash
 bash packaging/sign_macos.sh "dist/EcoTranscribe Desktop.app"
-bash packaging/make_dmg.sh 0.2.0 arm64 "$(git rev-parse --short HEAD)" \
-  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" v0.2.0
+bash packaging/make_dmg.sh 0.3.0 arm64 "$(git rev-parse --short HEAD)" \
+  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" v0.3.0
 ```
 
 Windows : `packaging/make_windows.ps1` produit le ZIP portable et, si Inno
@@ -268,10 +270,10 @@ docs/              # notice macOS, distribution, release notes
 
 `PySide6-Essentials` est borné à `< 6.10` (6.9.3) : les versions 6.10+ exigent
 macOS 13 ou 14 selon les wheels, alors que l'édition lite cible macOS 12+.
-Cette borne est nécessaire pour `macos-13` et macOS 12.
+Cette borne est nécessaire pour `macos-15-intel` et macOS 12.
 
 ## Licence
 
 MIT — voir [`LICENSE`](LICENSE). Les composants tiers et les licences
-embarquées (PySide6/Qt, ffmpeg GPL/LGPL selon la plateforme, keyring, etc.)
+embarquées (PySide6/Qt, ffmpeg LGPLv2.1+, keyring, etc.)
 sont documentés dans [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).

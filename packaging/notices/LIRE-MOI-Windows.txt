@@ -13,6 +13,10 @@ INSTALLATION
    comparer avec SHA256SUMS.txt, fourni avec la release.
 4. Lancer « EcoTranscribe Desktop.exe ».
 
+LICENCES
+ffmpeg/ffprobe : LGPLv2.1+ ; source et configuration dans
+THIRD_PARTY_NOTICES.md et le dépôt.
+
 DONNÉES
 L'édition lite envoie l'audio à OpenRouter pour transcription. Le prompt est
 envoyé comme contexte lorsque le modèle le supporte (modèles Mistral).

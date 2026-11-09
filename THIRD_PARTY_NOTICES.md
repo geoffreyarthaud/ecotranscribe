@@ -1,4 +1,4 @@
-# Third-party notices — EcoTranscribe Desktop lite 0.2.0
+# Third-party notices — EcoTranscribe Desktop lite
 
 EcoTranscribe est distribué sous licence MIT (voir `LICENSE`). Les composants
 suivants sont embarqués dans les artefacts binaires.
@@ -7,7 +7,8 @@ suivants sont embarqués dans les artefacts binaires.
 
 - Composant : PySide6-Essentials 6.9.3, Qt 6.9.
 - Licence : LGPLv3 (PySide6), LGPLv3/GPLv3 (Qt selon les modules).
-- Version épinglée `< 6.10` pour conserver macOS 12+ et `macos-13`.
+- Version épinglée `< 6.10` pour conserver macOS 12+ et le runner Intel
+  `macos-15-intel`.
 - Texte : <https://www.gnu.org/licenses/lgpl-3.0.html>.
 - Le build PyInstaller `--onedir` conserve les bibliothèques Qt sous forme de
   fichiers remplaçables dans `_internal/PySide6/Qt/lib` (ou l'équivalent
@@ -47,27 +48,22 @@ suivants sont embarqués dans les artefacts binaires.
 
 ## ffmpeg / ffprobe
 
-Les binaires sont téléchargés au build, vérifiés par SHA256 et embarqués dans
-`bin/` (`Contents/Resources/bin` sur macOS). Ils ne sont pas versionnés.
+Les binaires sont téléchargés ou construits au build, vérifiés par SHA256 et
+embarqués dans `bin/` (`Contents/Resources/bin` sur macOS). Ils ne sont pas
+versionnés.
 
-### macOS arm64 — build OSXExperts 9.0.2
+### macOS arm64 et x64 — build source EcoTranscribe 9.0.2 LGPL
 
-- Source : <https://www.osxexperts.net/>.
-- Configuration : `--enable-gpl` (GPLv2+), avec notamment libmp3lame, libx264,
-  libx265, libvpx.
-- Licence : GNU GPL version 2 ou ultérieure.
-- Texte : `notices/COPYING.GPLv2.txt`.
-- Source correspondante : <https://ffmpeg.org/download.html> et
-  <https://www.osxexperts.net/> (build GPL 9.0.2 arm64).
-- Aucun code source modifié par EcoTranscribe.
-
-### macOS x64 — build OSXExperts 8.0
-
-- Source : <https://www.osxexperts.net/>.
-- Configuration : GPLv2+.
-- Texte : `notices/COPYING.GPLv2.txt`.
-- Source correspondante : <https://ffmpeg.org/download.html> et
-  <https://www.osxexperts.net/> (build GPL 8.0 Intel).
+- Source : <https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz>.
+- SHA256 : `8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e`.
+- Configuration : `--disable-gpl --disable-nonfree --disable-version3`,
+  composants limités aux formats audio/vidéo pris en charge par
+  EcoTranscribe, `--enable-libmp3lame`.
+- Licence : GNU LGPL version 2.1 ou ultérieure.
+- Texte : `notices/COPYING.LGPLv2.1.txt`.
+- Source correspondante : le tarball ci-dessus, le script
+  `packaging/build_ffmpeg_source.py` et la configuration dans
+  `packaging/ffmpeg.lock.json`.
 - Aucun code source modifié par EcoTranscribe.
 
 ### Windows x64 et Linux x64 — builds BtbN 9.0.2 LGPL
@@ -78,6 +74,20 @@ Les binaires sont téléchargés au build, vérifiés par SHA256 et embarqués d
 - Source correspondante : <https://ffmpeg.org/download.html> et la release
   BtbN épinglée dans `ffmpeg.lock.json`.
 - Aucun code source modifié par EcoTranscribe.
+
+## LAME (libmp3lame)
+
+- Composant : LAME 3.100, bibliothèque `libmp3lame`.
+- Licence : GNU LGPL version 2.0.
+- Texte : `notices/COPYING.LGPLv2.0.txt`.
+- Source : <https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz>.
+- Utilisé par ffmpeg pour encoder les tranches MP3 envoyées à OpenRouter.
+
+## zlib
+
+- Composant : zlib, bibliothèque système sur macOS.
+- Licence : zlib License.
+- Texte : <https://zlib.net/zlib_license.html>.
 
 Les obligations GPL/LGPL applicables (notice, textes de licence, accès à la
 source correspondante) sont satisfaites par ce document, les fichiers de

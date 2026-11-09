@@ -1,46 +1,6 @@
 {
-  "version": 1,
+  "version": 2,
   "targets": {
-    "darwin-arm64": {
-      "sources": [
-        {
-          "url": "https://www.osxexperts.net/ffmpeg902arm.zip",
-          "sha256": "07e00300593799005b060c03a99fe648b1edda0f30c36b0c1adafe8e3247e586",
-          "type": "zip",
-          "files": {
-            "ffmpeg": "ffmpeg"
-          }
-        },
-        {
-          "url": "https://www.osxexperts.net/ffprobe902arm.zip",
-          "sha256": "ec72b6a81dac926bd568681d766b74943701f291ac3cdbb387829dc2a275a00b",
-          "type": "zip",
-          "files": {
-            "ffprobe": "ffprobe"
-          }
-        }
-      ]
-    },
-    "darwin-x64": {
-      "sources": [
-        {
-          "url": "https://www.osxexperts.net/ffmpeg80intel.zip",
-          "sha256": "2d24d22db78c87f394a5822867acd5c5dc5e762cd261a44bd26923f3a5af3e07",
-          "type": "zip",
-          "files": {
-            "ffmpeg": "ffmpeg"
-          }
-        },
-        {
-          "url": "https://www.osxexperts.net/ffprobe80intel.zip",
-          "sha256": "0b6576104a95c1b39d4939e2df86f8f7cf1d55287ff57da48777d94605d12feb",
-          "type": "zip",
-          "files": {
-            "ffprobe": "ffprobe"
-          }
-        }
-      ]
-    },
     "win-x64": {
       "sources": [
         {
@@ -67,5 +27,52 @@
         }
       ]
     }
+  },
+  "source_build": {
+    "targets": [
+      "darwin-arm64",
+      "darwin-x64"
+    ],
+    "license": "LGPL-2.1-or-later",
+    "ffmpeg": {
+      "version": "9.0.2",
+      "url": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz",
+      "sha256": "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e"
+    },
+    "lame": {
+      "version": "3.100",
+      "url": "https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz",
+      "sha256": "ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e"
+    },
+    "configure": [
+      "--disable-gpl",
+      "--disable-nonfree",
+      "--disable-version3",
+      "--disable-autodetect",
+      "--disable-doc",
+      "--disable-debug",
+      "--disable-ffplay",
+      "--disable-network",
+      "--disable-devices",
+      "--disable-shared",
+      "--enable-static",
+      "--disable-swscale",
+      "--disable-encoders",
+      "--enable-encoder=pcm_s16le,libmp3lame",
+      "--disable-muxers",
+      "--enable-muxer=wav,mp3,null",
+      "--disable-protocols",
+      "--enable-protocol=file,pipe",
+      "--disable-filters",
+      "--enable-filter=silencedetect,aresample,aformat,anull",
+      "--disable-demuxers",
+      "--enable-demuxer=aac,aiff,asf,avi,flac,flv,matroska,mov,mp3,mpegts,mxf,ogg,wav",
+      "--disable-decoders",
+      "--enable-decoder=aac,aac_latm,ac3,eac3,dca,truehd,mlp,flac,alac,opus,vorbis,mp1,mp2,mp3,wmav1,wmav2,wmapro,wmavoice,amrnb,amrwb,gsm,gsm_ms,speex,nellymoser,pcm_s16le,pcm_s16be,pcm_u8,pcm_s24le,pcm_s24be,pcm_s32le,pcm_s32be,pcm_f32le,pcm_f32be,pcm_f64le,pcm_f64be,pcm_alaw,pcm_mulaw,adpcm_ima_wav,adpcm_ms,adpcm_yamaha,adpcm_ima_qt",
+      "--enable-parser=aac,aac_latm,ac3,mlp,dca,flac,mpegaudio,opus,vorbis,h264,hevc,mpeg4video,mpegvideo,vc1,vp8,vp9,av1",
+      "--enable-libmp3lame",
+      "--enable-zlib",
+      "--disable-x86asm"
+    ]
   }
 }

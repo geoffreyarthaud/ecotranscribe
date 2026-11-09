@@ -17,15 +17,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15
             target: darwin-arm64
             arch: arm64
             platform: macos
-          - os: macos-13
+          - os: macos-15-intel
             target: darwin-x64
             arch: x64
             platform: macos
-          - os: windows-latest
+          - os: windows-2025
             target: win-x64
             arch: x64
             platform: windows
@@ -51,6 +51,29 @@ jobs:
       - name: Install lite and test dependencies
         run: uv sync --extra gui --extra dev
 
+      - name: Check version alignment
+        shell: bash
+        run: |
+          VERSION="$(uv run python -c 'import ecotranscribe; print(ecotranscribe.__version__)')"
+          PROJECT_VERSION="$(uv run python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          if [ "$VERSION" != "$PROJECT_VERSION" ]; then
+            echo "Version paquet ($VERSION) et pyproject ($PROJECT_VERSION) différentes" >&2
+            exit 1
+          fi
+          if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+            TAG="${GITHUB_REF_NAME#v}"
+            if [ "$TAG" != "$VERSION" ]; then
+              echo "Tag $GITHUB_REF_NAME != version $VERSION" >&2
+              exit 1
+            fi
+            NOTES="docs/release-notes-$VERSION.md"
+            if [ ! -f "$NOTES" ]; then
+              echo "Notes de version absentes : $NOTES" >&2
+              exit 1
+            fi
+          fi
+          echo "Version $VERSION alignée"
+
       - name: Run tests
         run: uv run pytest -q
 
@@ -72,8 +95,16 @@ jobs:
           path: vendor/ffmpeg
           key: ffmpeg-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('packaging/ffmpeg.lock.json') }}
 
-      - name: Fetch ffmpeg
+      - name: Build ffmpeg from source (macOS, LGPL)
+        if: runner.os == 'macOS'
+        run: uv run python packaging/build_ffmpeg_source.py --target "$ECOTRANSCRIBE_TARGET"
+
+      - name: Fetch prebuilt ffmpeg (Windows/Linux, LGPL)
+        if: runner.os != 'macOS'
         run: uv run python packaging/fetch_ffmpeg.py --target "$ECOTRANSCRIBE_TARGET"
+
+      - name: Check ffmpeg capabilities
+        run: uv run python packaging/check_ffmpeg_build.py --target "$ECOTRANSCRIBE_TARGET"
 
       - name: Generate icons
         run: uv run python packaging/make_icons.py
@@ -159,6 +190,37 @@ jobs:
             --diagnose --diagnose-output "$RUNNER_TEMP/diag-tar.json"
           uv run python packaging/check_diagnostic.py "$RUNNER_TEMP/diag-tar.json"
 
+      - name: Upload CI diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecotranscribe-diagnostics-${{ matrix.target }}
+          if-no-files-found: warn
+          path: ${{ runner.temp }}/diag*.json
+
+      - name: Publish CI summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## ${{ matrix.target }}"
+            echo ""
+            echo "- Runner: \`${{ matrix.os }}\`"
+            echo "- Version: \`$(uv run python -c 'import ecotranscribe; print(ecotranscribe.__version__)')\`"
+            FFMPEG="$(find "vendor/ffmpeg/${{ matrix.target }}" -maxdepth 1 -type f -name 'ffmpeg*' | head -1)"
+            if [ -n "$FFMPEG" ]; then
+              echo "- ffmpeg: \`$("$FFMPEG" -version 2>/dev/null | head -1)\`"
+            fi
+            for diag in "$RUNNER_TEMP"/diag*.json; do
+              [ -f "$diag" ] || continue
+              echo ""
+              echo "### $(basename "$diag")"
+              echo '```json'
+              cat "$diag"
+              echo '```'
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Verify lite contents and size
         shell: bash
         run: |
@@ -237,10 +299,20 @@ jobs:
           echo "Artefacts publiés :"
           ls -l
 
+      - name: Resolve release notes
+        id: notes
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          NOTES="docs/release-notes-$VERSION.md"
+          test -f "$NOTES"
+          echo "path=$NOTES" >> "$GITHUB_OUTPUT"
+
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          body_path: docs/release-notes-0.2.0.md
+          body_path: ${{ steps.notes.outputs.path }}
+          prerelease: ${{ contains(github.ref_name, '-rc') }}
           fail_on_unmatched_files: true
           files: release/*

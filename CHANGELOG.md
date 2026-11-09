@@ -1,12 +1,25 @@
 # Changelog
 
-## Non publié — 2026-11-08
+## 0.3.0 — 2026-11-09
+
+### Ajouté
+
+- Liste des modèles OpenRouter : `mistralai/voxtral-small-transcribe-3-0`
+  (nouveau défaut) et `mistralai/voxtral-mini-transcribe-3-0`.
+- Tarif horaire approximatif par modèle, récupéré de façon asynchrone depuis
+  OpenRouter et affiché entre parenthèses ; aucune indication si le réseau ou
+  l'API échoue.
 
 ### Modifié
 
+- Packaging : ffmpeg/ffprobe macOS compilés depuis FFmpeg 9.0.2 et LAME
+  3.100 en LGPLv2.1+, avec les seuls composants utilisés par EcoTranscribe ;
+  licence uniforme macOS/Windows/Linux, sans composant GPL.
 - Icône d'application issue du logo fourni (Dock, fenêtres, barre des
   tâches) ; l'en-tête affiche le logo à gauche, le titre centré et
   l'engrenage à droite.
+- Interface refondue en assistant à six écrans : accueil, clé conditionnelle,
+  fichier/prompt, réglages, progression, fin.
 - Interface condensée : titres de page retirés des étapes, accueil centré
   verticalement, nom de fichier redondant retiré du prompt, paddings
   verticaux des champs et boutons réduits.
@@ -15,13 +28,6 @@
 - Modèle présenté comme une liste stricte non éditable ; coût estimé de la
   vidéo affiché à deux chiffres significatifs, avec virgule décimale
   française et unité en fin de montant.
-
-## 0.3.0 — 2026-11-06
-
-### Modifié
-
-- Interface refondue en assistant à six écrans : accueil, clé conditionnelle,
-  fichier/prompt, réglages, progression, fin.
 - Page Options (clé OpenRouter et à propos) accessible depuis l'accueil et
   l'engrenage, hors parcours.
 - Progression avec journal permanent, annulation coopérative et erreurs
@@ -37,19 +43,6 @@
 - Liste des modèles à nouveau visible avec sa flèche de sélection.
 - Police Marianne utilisée lorsqu'elle est installée, sans embarquement ;
   repli Arial sinon.
-
-## Non publié — 2026-11-06
-
-### Ajouté
-
-- Liste des modèles OpenRouter : `mistralai/voxtral-small-transcribe-3-0`
-  (nouveau défaut) et `mistralai/voxtral-mini-transcribe-3-0`.
-- Tarif horaire approximatif par modèle, récupéré de façon asynchrone depuis
-  OpenRouter et affiché entre parenthèses ; aucune indication si le réseau ou
-  l'API échoue.
-
-### Modifié
-
 - Prérequis Python relevé à 3.13 ; Python 3.10 à 3.12 ne sont plus pris en
   charge pour le CLI et le développement.
 

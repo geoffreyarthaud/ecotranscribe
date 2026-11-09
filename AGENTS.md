@@ -78,7 +78,9 @@ uv run ecotranscribe-desktop
 uv run ecotranscribe-desktop --diagnose --diagnose-output /tmp/diag.json
 
 # Packaging (procédure complète dans docs/distribution.md)
-uv run python packaging/fetch_ffmpeg.py --target darwin-arm64
+uv run python packaging/build_ffmpeg_source.py --target darwin-arm64
+uv run python packaging/fetch_ffmpeg.py --target win-x64   # Windows/Linux
+uv run python packaging/check_ffmpeg_build.py --target darwin-arm64
 uv run python packaging/make_icons.py
 uv run pyinstaller --noconfirm packaging/pyinstaller.spec
 ```

@@ -10,10 +10,11 @@ from PyInstaller.utils.hooks import collect_submodules
 
 ROOT = Path(SPECPATH).resolve().parent
 sys.path.insert(0, str(ROOT / "packaging"))
+sys.path.insert(0, str(ROOT / "src"))
+from ecotranscribe import __version__ as VERSION  # noqa: E402
 from fetch_ffmpeg import detect_target  # noqa: E402
 
 TARGET = os.environ.get("ECOTRANSCRIBE_TARGET") or detect_target()
-VERSION = "0.2.0"
 APP_NAME = "EcoTranscribe Desktop"
 BIN_DIR = ROOT / "vendor" / "ffmpeg" / TARGET
 WIN = sys.platform == "win32"

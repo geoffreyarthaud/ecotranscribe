@@ -2,7 +2,7 @@
 
 ## Versions prises en charge
 
-La version 0.2.x de l'édition lite reçoit les correctifs de sécurité.
+La version 0.3.x de l'édition lite reçoit les correctifs de sécurité.
 
 ## Binaires non notariés
 
@@ -22,14 +22,14 @@ vérifié.
 
 ```bash
 # macOS
-shasum -a 256 ecotranscribe-desktop-lite-macos-arm64-0.2.0.dmg
+shasum -a 256 ecotranscribe-desktop-lite-macos-arm64-0.3.0.dmg
 codesign --verify --deep --strict --verbose=2 "/Applications/EcoTranscribe Desktop.app"
 
 # Windows
-certutil -hashfile ecotranscribe-desktop-lite-windows-x64-0.2.0.zip SHA256
+certutil -hashfile ecotranscribe-desktop-lite-windows-x64-0.3.0.zip SHA256
 
 # Linux
-sha256sum ecotranscribe-desktop-lite-linux-x64-0.2.0.AppImage
+sha256sum ecotranscribe-desktop-lite-linux-x64-0.3.0.AppImage
 ```
 
 Comparez avec `SHA256SUMS.txt` de la même release. `spctl --assess` est rejeté
@@ -57,9 +57,11 @@ artefact, étapes de reproduction et impact ; ne joignez pas de secret.
 ## Chaîne d'approvisionnement
 
 - `uv.lock` fige les dépendances Python ; `PyInstaller` est épinglé par le lock.
-- `packaging/ffmpeg.lock.json` fige URL et SHA256 de ffmpeg/ffprobe.
+- `packaging/ffmpeg.lock.json` fige URL, SHA256 et configuration de
+  ffmpeg/ffprobe. macOS compile FFmpeg 9.0.2 et LAME 3.100 depuis les sources ;
+  Windows/Linux utilisent des binaires BtbN LGPL épinglés.
 - `appimagetool` 1.9.1 est épinglé et vérifié par SHA256.
 - Les artefacts sont construits par GitHub Actions à partir du tag ; aucun
   binaire n'est commité.
-- Les licences et obligations ffmpeg (GPL/LGPL) sont documentées dans
+- Les licences et obligations ffmpeg/LAME sont documentées dans
   `THIRD_PARTY_NOTICES.md` et `packaging/notices/`.

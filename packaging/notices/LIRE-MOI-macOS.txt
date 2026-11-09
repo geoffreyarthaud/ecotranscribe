@@ -29,6 +29,8 @@ mais Gatekeeper demande une confirmation manuelle au premier lancement.
 SÉCURITÉ
 - Le code source et le workflow de build sont publics : {project_url}
 - Le binaire est produit par GitHub Actions à partir du tag {tag}.
+- ffmpeg/ffprobe sont des builds source LGPLv2.1+ ; source et configuration
+  dans THIRD_PARTY_NOTICES.md et le dépôt.
 - Ne désactivez pas Gatekeeper globalement.
 - Chaque nouvelle version téléchargée peut nécessiter à nouveau l'étape 2.
 

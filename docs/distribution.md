@@ -1,27 +1,27 @@
 # Distribution et build — EcoTranscribe Desktop lite
 
-Ce guide décrit le build local et la release GitHub de l'édition lite 0.2.0.
+Ce guide décrit le build local et la release GitHub de l'édition lite.
 
 ## Cibles
 
 | Cible | Runner CI | Artefacts |
 |---|---|---|
-| macOS arm64 | `macos-14` | `.dmg`, `.zip` |
-| macOS x64 | `macos-13` | `.dmg`, `.zip` |
-| Windows x64 | `windows-latest` | `.zip`, installeur Inno optionnel |
+| macOS arm64 | `macos-15` | `.dmg`, `.zip` |
+| macOS x64 | `macos-15-intel` | `.dmg`, `.zip` |
+| Windows x64 | `windows-2025` | `.zip`, installeur Inno optionnel |
 | Linux x64 | `ubuntu-22.04` | `.AppImage`, `.tar.gz` |
 
 Noms :
 
 ```text
-ecotranscribe-desktop-lite-macos-arm64-0.2.0.dmg
-ecotranscribe-desktop-lite-macos-arm64-0.2.0.zip
-ecotranscribe-desktop-lite-macos-x64-0.2.0.dmg
-ecotranscribe-desktop-lite-macos-x64-0.2.0.zip
-ecotranscribe-desktop-lite-windows-x64-0.2.0.zip
-ecotranscribe-desktop-lite-windows-x64-0.2.0-setup.exe
-ecotranscribe-desktop-lite-linux-x64-0.2.0.AppImage
-ecotranscribe-desktop-lite-linux-x64-0.2.0.tar.gz
+ecotranscribe-desktop-lite-macos-arm64-<version>.dmg
+ecotranscribe-desktop-lite-macos-arm64-<version>.zip
+ecotranscribe-desktop-lite-macos-x64-<version>.dmg
+ecotranscribe-desktop-lite-macos-x64-<version>.zip
+ecotranscribe-desktop-lite-windows-x64-<version>.zip
+ecotranscribe-desktop-lite-windows-x64-<version>-setup.exe
+ecotranscribe-desktop-lite-linux-x64-<version>.AppImage
+ecotranscribe-desktop-lite-linux-x64-<version>.tar.gz
 SHA256SUMS.txt
 ```
 
@@ -34,24 +34,39 @@ ignorés.
 uv sync --extra gui --extra dev
 ```
 
-`fetch_ffmpeg.py` est la seule étape réseau du build. Le lock
-`packaging/ffmpeg.lock.json` fixe URL, SHA256, type d'archive et membres :
+Sur macOS, la compilation source de ffmpeg nécessite les Xcode Command Line
+Tools (`clang`, `make`). `--disable-x86asm` évite la dépendance `nasm` ; LAME
+et FFmpeg sont compilés depuis leurs tarballs, sans Homebrew.
+
+`build_ffmpeg_source.py` (macOS) et `fetch_ffmpeg.py` (Windows/Linux) sont les
+seules étapes réseau du build. Le lock `packaging/ffmpeg.lock.json` fixe URL,
+SHA256, version et configuration :
 
 | Cible | Build | Licence |
 |---|---|---|
-| `darwin-arm64` | OSXExperts 9.0.2 | GPLv2+ |
-| `darwin-x64` | OSXExperts 8.0 | GPLv2+ |
+| `darwin-arm64` | source FFmpeg 9.0.2 + LAME 3.100 | LGPLv2.1+ |
+| `darwin-x64` | source FFmpeg 9.0.2 + LAME 3.100 | LGPLv2.1+ |
 | `win-x64` | BtbN 9.0.2 static | LGPLv2.1+ |
 | `linux-x64` | BtbN 9.0.2 static | LGPLv2.1+ |
 
 ```bash
-uv run python packaging/fetch_ffmpeg.py --target darwin-arm64
-# ou --target win-x64 / linux-x64 / darwin-x64
+# macOS : compilation LGPL depuis les sources
+uv run python packaging/build_ffmpeg_source.py --target darwin-arm64
+# ou --target darwin-x64 sur une machine/runner Intel
+
+# Windows/Linux : binaire précompilé LGPL, vérifié par SHA256
+uv run python packaging/fetch_ffmpeg.py --target win-x64
+# ou --target linux-x64
+
+# Vérification fonctionnelle et de licence
+uv run python packaging/check_ffmpeg_build.py --target darwin-arm64
 ```
 
-Le script vérifie le SHA256 avant extraction, extrait uniquement les membres
-déclarés et rend les binaires exécutables. Le cache CI est indexé par le hash
-du lock.
+Le build macOS vérifie les SHA256 des tarballs FFmpeg et LAME, compile LAME en
+statique, configure FFmpeg avec les composants strictement utilisés par
+l'application, puis exécute le même contrôle que `check_ffmpeg_build.py`. Le
+cache CI est indexé par le hash du lock ; un second appel est ignoré si le
+marqueur `.source-build.json` correspond. Utiliser `--force` pour reconstruire.
 
 `ECOTRANSCRIBE_FFMPEG_DIR` permet de pointer vers un autre dossier en
 développement. Hors override, la résolution cherche `_MEIPASS/bin`,
@@ -96,9 +111,9 @@ Caractéristiques :
 ```bash
 bash packaging/sign_macos.sh "dist/EcoTranscribe Desktop.app"
 
-bash packaging/make_dmg.sh 0.2.0 arm64 \
+bash packaging/make_dmg.sh 0.3.0 arm64 \
   "$(git rev-parse --short HEAD)" \
-  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" v0.2.0
+  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" v0.3.0
 ```
 
 La signature est faite de l'intérieur vers l'extérieur :
@@ -196,7 +211,11 @@ QT_QPA_PLATFORM=offscreen "/tmp/eco-tar/EcoTranscribe Desktop/EcoTranscribe Desk
 
 - déclencheurs : tags `v*`, `workflow_dispatch` ;
 - tests `uv run pytest` sur chaque OS, avec `QT_QPA_PLATFORM=offscreen` ;
+- garde-fou tag == version paquet == `pyproject.toml`, et présence de
+  `docs/release-notes-<version>.md` ;
 - cache uv et cache ffmpeg (clé = hash du lock) ;
+- build source LGPL de ffmpeg sur macOS, récupération des binaires LGPL
+  épinglés sur Windows/Linux, puis contrôle `check_ffmpeg_build.py` ;
 - build, signature macOS, DMG/ZIP, ZIP Windows/Inno, AppImage/tar.gz ;
 - diagnostic gelé, vérification ffmpeg, absence torch/whisper, tailles ;
 - upload d'artefacts et fragments SHA256 ;
@@ -210,7 +229,10 @@ Aucun secret n'est requis pour construire les artefacts.
 
 - [ ] `uv run pytest` passe sur les trois OS.
 - [ ] `uv run ecotranscribe-desktop` ouvre la fenêtre en développement.
-- [ ] `packaging/fetch_ffmpeg.py` vérifie les SHA256.
+- [ ] `build_ffmpeg_source.py` (macOS) et `fetch_ffmpeg.py` (Windows/Linux)
+      vérifient les SHA256.
+- [ ] `check_ffmpeg_build.py` confirme LGPLv2.1+, `silencedetect`,
+      `libmp3lame` et les formats supportés.
 - [ ] `pyinstaller.spec` produit un onedir sans torch/whisper.
 - [ ] macOS : `codesign --verify --deep --strict` OK, `spctl` rejeté comme
       attendu, DMG avec notice/licences/lien Applications.
@@ -220,6 +242,8 @@ Aucun secret n'est requis pour construire les artefacts.
       dans le bundle.
 - [ ] Tailles : app ≤ 450 Mo, artefact compressé ≤ 300 Mo.
 - [ ] `SHA256SUMS.txt` couvre tous les assets.
+- [ ] Tag `v<version>` == version paquet == `pyproject.toml`, et
+      `docs/release-notes-<version>.md` présent.
 - [ ] README, notices et release notes à jour.
 
 ## Dépannage
@@ -233,6 +257,7 @@ Aucun secret n'est requis pour construire les artefacts.
 - **Trousseau Linux** : installer un service Secret Service (GNOME Keyring,
   KWallet) ; sinon utiliser la variable d'environnement.
 - **ffmpeg introuvable** : vérifier `ECOTRANSCRIBE_FFMPEG_DIR` en
-  développement, ou réinstaller l'artefact.
+  développement, relancer `build_ffmpeg_source.py --force` sur macOS ou
+  réinstaller l'artefact.
 - **Taille dépassée** : inspecter les plugins Qt, les doublons PyInstaller et
   la taille du build ffmpeg. Ne pas retirer de fonctionnalité sans validation.

@@ -18,7 +18,7 @@ from urllib.parse import urlparse
 ROOT = Path(__file__).resolve().parent.parent
 LOCK_PATH = Path(__file__).with_name("ffmpeg.lock.json")
 VENDOR = ROOT / "vendor"
-USER_AGENT = "ecotranscribe-fetch-ffmpeg/0.2.0"
+USER_AGENT = "ecotranscribe-fetch-ffmpeg"
 
 
 class FetchError(RuntimeError):
@@ -41,7 +41,7 @@ def detect_target() -> str:
     raise FetchError(f"Plateforme non supportée : {sys.platform}")
 
 
-def _sha256(path: Path) -> str:
+def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for block in iter(lambda: handle.read(1024 * 1024), b""):
@@ -77,28 +77,32 @@ def _download(url: str, destination: Path) -> None:
         raise
 
 
+def download_verified(
+    url: str, expected: str, destination: Path
+) -> Path:
+    """Télécharge un fichier et vérifie son SHA256 avant de le conserver."""
+    if destination.exists() and sha256_file(destination) == expected:
+        return destination
+    destination.unlink(missing_ok=True)
+    try:
+        _download(url, destination)
+    except Exception as exc:
+        raise FetchError(f"Téléchargement impossible pour {url} : {exc}") from exc
+    actual = sha256_file(destination)
+    if actual != expected:
+        destination.unlink(missing_ok=True)
+        raise FetchError(
+            f"SHA256 invalide pour {url} : attendu {expected}, obtenu {actual}"
+        )
+    return destination
+
+
 def _cached_archive(
     source: dict, download_dir: Path
 ) -> Path:
     expected = source["sha256"]
     archive = download_dir / (expected + _cache_suffix(source))
-    if archive.exists() and _sha256(archive) == expected:
-        return archive
-    archive.unlink(missing_ok=True)
-    try:
-        _download(source["url"], archive)
-    except Exception as exc:
-        raise FetchError(
-            f"Téléchargement impossible pour {source['url']} : {exc}"
-        ) from exc
-    actual = _sha256(archive)
-    if actual != expected:
-        archive.unlink(missing_ok=True)
-        raise FetchError(
-            f"SHA256 invalide pour {source['url']} : "
-            f"attendu {expected}, obtenu {actual}"
-        )
-    return archive
+    return download_verified(source["url"], expected, archive)
 
 
 def _extract_zip(archive: Path, member: str) -> bytes:
@@ -141,6 +145,12 @@ def fetch_target(
     try:
         entry = lock["targets"][target]
     except KeyError as exc:
+        source_targets = lock.get("source_build", {}).get("targets", [])
+        if target in source_targets:
+            raise FetchError(
+                f"Cible {target} : build source requis. Lancez "
+                f"packaging/build_ffmpeg_source.py --target {target}."
+            ) from exc
         raise FetchError(f"Cible inconnue : {target}") from exc
 
     destination = Path(dest) if dest is not None else VENDOR / "ffmpeg" / target

@@ -74,18 +74,34 @@ def test_detect_target_mapping(
 
 def test_real_lock_is_pinned_and_covers_all_targets(fetch) -> None:
     lock = json.loads((ROOT / "packaging" / "ffmpeg.lock.json").read_text())
-    assert set(lock["targets"]) == {
-        "darwin-arm64",
-        "darwin-x64",
-        "win-x64",
-        "linux-x64",
-    }
+    assert set(lock["targets"]) == {"win-x64", "linux-x64"}
     for target in lock["targets"].values():
         assert target["sources"]
         for source in target["sources"]:
             assert "latest" not in source["url"].lower()
             assert len(source["sha256"]) == 64
             assert source["files"]
+
+    source_build = lock["source_build"]
+    assert set(source_build["targets"]) == {"darwin-arm64", "darwin-x64"}
+    assert source_build["license"] == "LGPL-2.1-or-later"
+    for component in ("ffmpeg", "lame"):
+        assert "latest" not in source_build[component]["url"].lower()
+        assert len(source_build[component]["sha256"]) == 64
+    configure = source_build["configure"]
+    assert "--disable-gpl" in configure
+    assert "--disable-nonfree" in configure
+    assert "--enable-libmp3lame" in configure
+
+
+def test_fetch_rejects_source_build_target(fetch, tmp_path: Path) -> None:
+    with pytest.raises(fetch.FetchError, match="build source requis"):
+        fetch.fetch_target(
+            "darwin-arm64",
+            dest=tmp_path / "out",
+            lock_path=ROOT / "packaging" / "ffmpeg.lock.json",
+            download_dir=tmp_path / "cache",
+        )
 
 
 def test_extracts_zip_and_sets_executable(
