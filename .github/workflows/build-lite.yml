@@ -291,6 +291,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: release
+          pattern: ecotranscribe-lite-*
           merge-multiple: true
 
       - name: Build SHA256SUMS.txt
