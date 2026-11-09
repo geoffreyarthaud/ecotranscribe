@@ -3,6 +3,7 @@
   "updated_at": "2026-11-09",
   "models": [
     "mistralai/voxtral-small-transcribe-3-0",
-    "mistralai/voxtral-mini-transcribe-3-0"
+    "mistralai/voxtral-mini-transcribe-3-0",
+    "microsoft/mai-transcribe-2"
   ]
 }
