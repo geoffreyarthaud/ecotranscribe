@@ -74,14 +74,16 @@ jobs:
           fi
           echo "Version $VERSION alignée"
 
-      - name: Run tests
-        run: uv run pytest -q
-
       - name: Install Linux runtime dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libfuse2 squashfs-tools desktop-file-utils
+          sudo apt-get install -y \
+            libegl1 libgl1 libxkbcommon-x11-0 libxcb-cursor0 libdbus-1-3 \
+            libfuse2 squashfs-tools desktop-file-utils
+
+      - name: Run tests
+        run: uv run pytest -q
 
       - name: Install Inno Setup (optional)
         if: runner.os == 'Windows'

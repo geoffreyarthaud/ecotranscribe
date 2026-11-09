@@ -1,0 +1,3 @@
+# Les goldens SRT/TXT doivent rester en LF sur tous les OS.
+tests/fixtures/sample.srt -text
+tests/fixtures/sample.txt -text
