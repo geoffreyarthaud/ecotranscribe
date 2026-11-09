@@ -57,6 +57,9 @@ Icon=ecotranscribe
 Categories=AudioVideo;Audio;Utility;
 Terminal=false
 EOF
+cp "$APPDIR/usr/share/applications/ecotranscribe.desktop" \
+  "$APPDIR/ecotranscribe.desktop"
+test -f "$APPDIR/ecotranscribe.desktop"
 
 uv run --project "$ROOT" python "$ROOT/packaging/render_notices.py" \
   --os linux \
