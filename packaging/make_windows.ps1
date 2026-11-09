@@ -3,7 +3,7 @@ param(
     [string]$Arch = "x64",
     [string]$Commit = "dev",
     [string]$BuildDate = "",
-    [string]$ProjectUrl = "https://github.com/ecotranscribe/ecotranscribe"
+    [string]$ProjectUrl = "https://github.com/geoffreyarthaud/ecotranscribe"
 )
 
 $ErrorActionPreference = "Stop"

@@ -7,7 +7,7 @@ ABOUT = {
     "commit": "abc123",
     "build_date": "2026-11-06T10:00:00Z",
     "license": "MIT",
-    "source": "https://github.com/ecotranscribe/ecotranscribe",
+    "source": "https://github.com/geoffreyarthaud/ecotranscribe",
 }
 
 

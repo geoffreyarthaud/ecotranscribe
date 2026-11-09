@@ -25,7 +25,7 @@ ecotranscribe = "ecotranscribe.cli:main"
 ecotranscribe-desktop = "ecotranscribe.gui.app:main"
 
 [project.urls]
-Source = "https://github.com/ecotranscribe/ecotranscribe"
+Source = "https://github.com/geoffreyarthaud/ecotranscribe"
 
 [build-system]
 requires = ["hatchling"]

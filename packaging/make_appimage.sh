@@ -6,7 +6,7 @@ ARCH="${2:-x64}"
 COMMIT="${3:-dev}"
 BUILD_DATE="${4:-}"
 TAG="${5:-v$VERSION}"
-PROJECT_URL="${PROJECT_URL:-https://github.com/ecotranscribe/ecotranscribe}"
+PROJECT_URL="${PROJECT_URL:-https://github.com/geoffreyarthaud/ecotranscribe}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST="$ROOT/dist"

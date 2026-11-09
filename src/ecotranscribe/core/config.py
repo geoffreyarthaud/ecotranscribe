@@ -5,7 +5,8 @@ from __future__ import annotations
 APP_NAME = "EcoTranscribe Desktop"
 APP_SLUG = "ecotranscribe"
 FLAVOR = "desktop"
-PROJECT_URL = "https://github.com/ecotranscribe/ecotranscribe"
+GITHUB_REPOSITORY = "geoffreyarthaud/ecotranscribe"
+PROJECT_URL = f"https://github.com/{GITHUB_REPOSITORY}"
 
 WHISPER_MODEL = "medium"
 WHISPER_OPTIONS: dict = {
@@ -21,7 +22,7 @@ OPENROUTER_MODELS: tuple[str, ...] = (
     "mistralai/voxtral-mini-transcribe-3-0",
 )
 MODELS_CATALOG_URL = (
-    "https://raw.githubusercontent.com/ecotranscribe/ecotranscribe/"
+    f"https://raw.githubusercontent.com/{GITHUB_REPOSITORY}/"
     "main/catalog/models.json"
 )
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/audio/transcriptions"

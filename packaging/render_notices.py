@@ -51,7 +51,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--tag", default="v0.4.0")
     parser.add_argument(
         "--project-url",
-        default="https://github.com/ecotranscribe/ecotranscribe",
+        default="https://github.com/geoffreyarthaud/ecotranscribe",
     )
     args = parser.parse_args(argv)
     render(

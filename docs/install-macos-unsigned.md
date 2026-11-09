@@ -4,7 +4,7 @@ EcoTranscribe Desktop 0.4.0.
 
 Version 0.4.0 — build CI
 Commit : voir la release `v0.4.0` (`SHA256SUMS.txt` et notes de release).
-Source : <https://github.com/ecotranscribe/ecotranscribe>
+Source : <https://github.com/geoffreyarthaud/ecotranscribe>
 
 Cette application est open-source (MIT). Le binaire macOS est **signé
 ad-hoc**, mais **non notarié** : le projet ne dispose pas d'un compte Apple
@@ -69,7 +69,7 @@ nouvelle version téléchargée peut nécessiter à nouveau cette étape.
 ## Sécurité
 
 - Code source et workflow de build publics :
-  <https://github.com/ecotranscribe/ecotranscribe>
+  <https://github.com/geoffreyarthaud/ecotranscribe>
 - Le binaire est produit par GitHub Actions à partir du tag `v0.4.0`.
 - La release publie `SHA256SUMS.txt`.
 - Le bundle embarque `ffmpeg`/`ffprobe` ; aucun `ffmpeg` système ni Python

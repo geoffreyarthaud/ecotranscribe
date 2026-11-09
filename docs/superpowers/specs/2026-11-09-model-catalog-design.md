@@ -9,7 +9,7 @@ versionné dans le dépôt.
 ## Décisions
 
 - Source canonique : `catalog/models.json`, commité sur la branche `main`.
-- URL primaire : `https://raw.githubusercontent.com/ecotranscribe/ecotranscribe/main/catalog/models.json`.
+- URL primaire : `https://raw.githubusercontent.com/geoffreyarthaud/ecotranscribe/main/catalog/models.json`.
 - Aucun domaine personnalisé pour 0.4.0.
 - Schéma versionné (`schema: 1`) ; seuls des identifiants de modèles sont
   publiés. Les tarifs restent récupérés en direct depuis OpenRouter.

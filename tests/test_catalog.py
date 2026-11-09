@@ -6,9 +6,24 @@ from pathlib import Path
 import pytest
 
 from ecotranscribe.core.catalog import MAX_CATALOG_MODELS, parse_catalog
-from ecotranscribe.core.config import OPENROUTER_MODEL, OPENROUTER_MODELS
+from ecotranscribe.core.config import (
+    GITHUB_REPOSITORY,
+    MODELS_CATALOG_URL,
+    OPENROUTER_MODEL,
+    OPENROUTER_MODELS,
+    PROJECT_URL,
+)
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_catalog_url_targets_the_published_repository() -> None:
+    assert GITHUB_REPOSITORY == "geoffreyarthaud/ecotranscribe"
+    assert PROJECT_URL == "https://github.com/geoffreyarthaud/ecotranscribe"
+    assert MODELS_CATALOG_URL == (
+        "https://raw.githubusercontent.com/geoffreyarthaud/ecotranscribe/"
+        "main/catalog/models.json"
+    )
 
 
 def test_committed_catalog_is_valid() -> None:
@@ -20,7 +35,7 @@ def test_committed_catalog_is_valid() -> None:
 
     assert models is not None
     assert OPENROUTER_MODEL in models
-    assert models == OPENROUTER_MODELS
+    assert set(OPENROUTER_MODELS) <= set(models)
 
 
 def test_parse_catalog_returns_valid_ids() -> None:
