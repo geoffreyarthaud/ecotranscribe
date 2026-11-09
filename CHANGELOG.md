@@ -4,6 +4,9 @@
 
 ### Modifié
 
+- Icône d'application issue du logo fourni (Dock, fenêtres, barre des
+  tâches) ; l'en-tête affiche le logo à gauche, le titre centré et
+  l'engrenage à droite.
 - Interface condensée : titres de page retirés des étapes, accueil centré
   verticalement, nom de fichier redondant retiré du prompt, paddings
   verticaux des champs et boutons réduits.

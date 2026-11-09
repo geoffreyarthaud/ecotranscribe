@@ -63,8 +63,12 @@ développement. Hors override, la résolution cherche `_MEIPASS/bin`,
 uv run python packaging/make_icons.py
 ```
 
-Génère `packaging/build/icon.png`, `EcoTranscribe.icns` (macOS avec
-`iconutil`) et `icon.ico` (Pillow). Le SVG source est `packaging/icon.svg`.
+Génère les PNG multi-tailles embarqués dans
+`src/ecotranscribe/gui/assets/` (icône de l'application et logo d'en-tête),
+puis `packaging/build/icon.png`, `EcoTranscribe.icns` (macOS avec
+`iconutil`) et `icon.ico` (Pillow). La source est
+`assets/ecotranscribe-650.png` ; relancer le script après tout changement de
+logo.
 
 ## Build PyInstaller
 

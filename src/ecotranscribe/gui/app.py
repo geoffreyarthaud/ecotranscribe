@@ -12,6 +12,7 @@ from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QApplication
 
 from ecotranscribe.core.config import APP_NAME, APP_SLUG
+from ecotranscribe.gui.app_icon import app_icon
 from ecotranscribe.gui.availability import collect_diagnostic
 from ecotranscribe.gui.dialogs import QtDialogService
 from ecotranscribe.gui.logging_setup import configure_logging
@@ -62,10 +63,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run_diagnostic(args.diagnose_output)
 
     app = QApplication.instance()
-    if app is None:
+    if not isinstance(app, QApplication):
         app = QApplication(sys.argv[:1])
     app.setApplicationName(APP_NAME)
     app.setOrganizationName(APP_SLUG)
+    app.setWindowIcon(app_icon())
 
     configure_logging()
     apply_theme(app)

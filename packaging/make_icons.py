@@ -1,26 +1,28 @@
 #!/usr/bin/env python3
-"""Génère PNG, .icns et .ico depuis packaging/icon.svg."""
+"""Génère les tailles d'icône depuis assets/ecotranscribe-650.png.
+
+Produit les PNG multi-tailles embarqués par l'application
+(`src/ecotranscribe/gui/assets/`) ainsi que `icon.png`, `EcoTranscribe.icns`
+et `icon.ico` dans `packaging/build/` pour la distribution.
+"""
 
 from __future__ import annotations
 
 import argparse
-import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-
-from PySide6.QtCore import Qt  # noqa: E402
-from PySide6.QtGui import QGuiApplication, QImage, QPainter  # noqa: E402
-from PySide6.QtSvg import QSvgRenderer  # noqa: E402
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_SVG = ROOT / "packaging" / "icon.svg"
+DEFAULT_SOURCE = ROOT / "assets" / "ecotranscribe-650.png"
 DEFAULT_OUTPUT = ROOT / "packaging" / "build"
+DEFAULT_ASSETS = ROOT / "src" / "ecotranscribe" / "gui" / "assets"
 
-_ICONSET = (
+RUNTIME_SIZES = (16, 24, 32, 48, 64, 128, 256, 512)
+ICONSET = (
     ("icon_16x16.png", 16),
     ("icon_16x16@2x.png", 32),
     ("icon_32x32.png", 32),
@@ -34,25 +36,28 @@ _ICONSET = (
 )
 
 
-def _render(renderer: QSvgRenderer, size: int) -> QImage:
-    image = QImage(size, size, QImage.Format.Format_ARGB32)
-    image.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(image)
-    renderer.render(painter)
-    painter.end()
-    return image
+def _scaled(image: Image.Image, size: int) -> Image.Image:
+    return image.resize((size, size), Image.Resampling.LANCZOS)
 
 
-def generate(svg: Path, output: Path) -> list[Path]:
-    output.mkdir(parents=True, exist_ok=True)
-    app = QGuiApplication.instance() or QGuiApplication([])
-    renderer = QSvgRenderer(str(svg))
-    if not renderer.isValid():
-        raise SystemExit(f"SVG invalide : {svg}")
+def generate(source: Path, output: Path, assets: Path) -> list[Path]:
+    """Écrit les icônes dérivées et retourne les chemins produits."""
+    with Image.open(source) as raw:
+        image = raw.convert("RGBA")
+    if image.width != image.height:
+        raise SystemExit(f"Logo non carré : {source} ({image.width}×{image.height})")
 
     produced: list[Path] = []
+
+    assets.mkdir(parents=True, exist_ok=True)
+    for size in RUNTIME_SIZES:
+        path = assets / f"icon-{size}.png"
+        _scaled(image, size).save(path, format="PNG", optimize=True)
+        produced.append(path)
+
+    output.mkdir(parents=True, exist_ok=True)
     png = output / "icon.png"
-    _render(renderer, 1024).save(str(png), "PNG")
+    _scaled(image, 1024).save(png, format="PNG", optimize=True)
     produced.append(png)
 
     if sys.platform == "darwin" and shutil.which("iconutil"):
@@ -60,8 +65,10 @@ def generate(svg: Path, output: Path) -> list[Path]:
         if iconset.exists():
             shutil.rmtree(iconset)
         iconset.mkdir(parents=True)
-        for name, size in _ICONSET:
-            _render(renderer, size).save(str(iconset / name), "PNG")
+        for name, size in ICONSET:
+            _scaled(image, size).save(
+                iconset / name, format="PNG", optimize=True
+            )
         icns = output / "EcoTranscribe.icns"
         subprocess.run(
             ["iconutil", "-c", "icns", str(iconset), "-o", str(icns)],
@@ -69,38 +76,25 @@ def generate(svg: Path, output: Path) -> list[Path]:
         )
         produced.append(icns)
 
-    try:
-        from PIL import Image
-    except ImportError as exc:
-        raise SystemExit(
-            "Pillow est requis : uv sync --extra dev"
-        ) from exc
     ico = output / "icon.ico"
-    with Image.open(png) as image:
-        image.save(
-            ico,
-            format="ICO",
-            sizes=[
-                (16, 16),
-                (24, 24),
-                (32, 32),
-                (48, 48),
-                (64, 64),
-                (128, 128),
-                (256, 256),
-            ],
-        )
+    _scaled(image, 256).save(
+        ico,
+        format="ICO",
+        sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)],
+    )
     produced.append(ico)
-    app.processEvents()
     return produced
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--svg", type=Path, default=DEFAULT_SVG)
+    parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--assets-dir", type=Path, default=DEFAULT_ASSETS)
     args = parser.parse_args(argv)
-    for path in generate(args.svg, args.output_dir):
+    if not args.source.is_file():
+        raise SystemExit(f"Logo introuvable : {args.source}")
+    for path in generate(args.source, args.output_dir, args.assets_dir):
         print(path)
     return 0
 

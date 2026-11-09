@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import QSettings
-from PySide6.QtWidgets import QPushButton
+from PySide6.QtWidgets import QLabel, QPushButton
 
 from ecotranscribe.core.config import OPENROUTER_MODEL
 from ecotranscribe.core.errors import EngineUnavailableError, TranscribeError
@@ -80,6 +80,22 @@ def test_home_without_key_shows_note(qtbot, app_settings, monkeypatch) -> None:
     assert window.gear_button.isVisibleTo(window)
     assert not window.gear_button.icon().isNull()
     assert window.gear_button.text() == ""
+
+
+def test_header_shows_logo_centered_title_and_gear(qtbot, app_settings) -> None:
+    window, _service, _dialogs, _probe, _store = _window(qtbot, app_settings)
+    logo = window.findChild(QLabel, "appLogo")
+    title = window.findChild(QLabel, "appTitle")
+    assert logo is not None and logo.pixmap() is not None
+    assert not logo.pixmap().isNull()
+    assert title is not None
+    assert title.text() == "EcoTranscribe"
+    header = logo.parentWidget()
+    assert title.parentWidget() is header
+    assert window.gear_button.parentWidget() is header
+    assert logo.geometry().left() < title.geometry().left()
+    assert title.geometry().left() < window.gear_button.geometry().left()
+    assert abs(title.geometry().center().x() - header.rect().center().x()) <= 1
 
 
 def test_select_file_with_key_skips_key_page(qtbot, app_settings, tmp_path) -> None:

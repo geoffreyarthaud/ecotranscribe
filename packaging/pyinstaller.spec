@@ -59,6 +59,12 @@ datas = [
 notices_dir = ROOT / "packaging" / "notices"
 if notices_dir.is_dir():
     datas.append((str(notices_dir), "notices"))
+datas.append(
+    (
+        str(ROOT / "src" / "ecotranscribe" / "gui" / "assets"),
+        "ecotranscribe/gui/assets",
+    )
+)
 
 hiddenimports = collect_submodules("keyring.backends", on_error="ignore")
 hiddenimports.append("ecotranscribe_build_info")

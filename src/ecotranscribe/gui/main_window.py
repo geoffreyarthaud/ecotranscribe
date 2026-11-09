@@ -49,6 +49,7 @@ from ..core.models import (
 from ..core.outputs import existing_outputs, output_paths
 from ..core.prompts import resolve_prompt
 from ..core.service import TranscribeService
+from .app_icon import app_icon_pixmap
 from .availability import build_info
 from .dialogs import DialogService
 from .duration import DurationProbe
@@ -151,8 +152,16 @@ class MainWindow(QMainWindow):
         header = QWidget()
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(32, 16, 32, 16)
-        title = QLabel("EcoTranscribe Desktop")
+        self.logo_label = QLabel()
+        self.logo_label.setObjectName("appLogo")
+        self.logo_label.setPixmap(app_icon_pixmap(32))
+        self.logo_label.setFixedSize(40, 40)
+        self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.logo_label.setAccessibleName("EcoTranscribe")
+        title = QLabel("EcoTranscribe")
+        title.setObjectName("appTitle")
         title.setProperty("role", "sectionTitle")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.gear_button = QToolButton()
         self.gear_button.setIcon(gear_icon())
         self.gear_button.setIconSize(QSize(22, 22))
@@ -160,6 +169,8 @@ class MainWindow(QMainWindow):
         self.gear_button.setAccessibleName("Options")
         self.gear_button.setFixedSize(40, 40)
         self.gear_button.setProperty("variant", "tertiary")
+        header_layout.addWidget(self.logo_label)
+        header_layout.addStretch(1)
         header_layout.addWidget(title)
         header_layout.addStretch(1)
         header_layout.addWidget(self.gear_button)
