@@ -232,7 +232,8 @@ def check_tools(
     version = _run([ffmpeg, "-hide_banner", "-version"])
     if version.returncode != 0:
         raise CheckError(f"ffmpeg -version a échoué : {version.stderr.strip()}")
-    if not version.stdout.startswith("ffmpeg version 9."):
+    match = re.match(r"ffmpeg version n?(\d+)\.", version.stdout)
+    if not match or match.group(1) != "9":
         raise CheckError(
             "version ffmpeg inattendue : "
             + (version.stdout.splitlines()[0] if version.stdout else "vide")

@@ -10,6 +10,7 @@ import os
 import platform
 import sys
 import tarfile
+import time
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -80,21 +81,30 @@ def _download(url: str, destination: Path) -> None:
 def download_verified(
     url: str, expected: str, destination: Path
 ) -> Path:
-    """Télécharge un fichier et vérifie son SHA256 avant de le conserver."""
+    """Télécharge un fichier et vérifie son SHA256, avec trois tentatives."""
     if destination.exists() and sha256_file(destination) == expected:
         return destination
-    destination.unlink(missing_ok=True)
-    try:
-        _download(url, destination)
-    except Exception as exc:
-        raise FetchError(f"Téléchargement impossible pour {url} : {exc}") from exc
-    actual = sha256_file(destination)
-    if actual != expected:
+    last_error: Exception | None = None
+    for attempt in range(3):
         destination.unlink(missing_ok=True)
-        raise FetchError(
-            f"SHA256 invalide pour {url} : attendu {expected}, obtenu {actual}"
-        )
-    return destination
+        try:
+            _download(url, destination)
+        except Exception as exc:
+            last_error = exc
+        else:
+            actual = sha256_file(destination)
+            if actual == expected:
+                return destination
+            last_error = FetchError(
+                f"SHA256 invalide pour {url} : "
+                f"attendu {expected}, obtenu {actual}"
+            )
+            destination.unlink(missing_ok=True)
+        if attempt < 2:
+            time.sleep(attempt + 1)
+    raise FetchError(
+        f"Téléchargement impossible pour {url} : {last_error}"
+    )
 
 
 def _cached_archive(

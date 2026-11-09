@@ -82,6 +82,9 @@ def test_real_lock_is_pinned_and_covers_all_targets(fetch) -> None:
             assert len(source["sha256"]) == 64
             assert source["files"]
 
+    win_files = lock["targets"]["win-x64"]["sources"][0]["files"]
+    assert set(win_files) == {"ffmpeg.exe", "ffprobe.exe"}
+
     source_build = lock["source_build"]
     assert set(source_build["targets"]) == {"darwin-arm64", "darwin-x64"}
     assert source_build["license"] == "LGPL-2.1-or-later"
