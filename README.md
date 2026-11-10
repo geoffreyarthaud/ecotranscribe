@@ -188,6 +188,12 @@ vérification de mise à jour. Le coût cumulé `usage.cost` est affiché après
 transcription. `0.0` est un coût valide ; le champ absent donne
 « Coût indisponible ».
 
+L'application respecte les proxies système : variables d'environnement
+`HTTP_PROXY`/`HTTPS_PROXY`, configuration macOS, registre Windows, et
+fichiers PAC via Qt dans l'interface graphique. Le CLI utilise le
+comportement standard de `urllib`. La résolution d'un PAC contacte le
+serveur qui l'héberge ; aucune donnée utilisateur n'est transmise.
+
 ## Distribution
 
 Les releases GitHub publient :

@@ -281,3 +281,38 @@ def test_engine_never_reads_api_key_from_environment(
         _request(tmp_path, api_key="request-key"), cancel=CancelToken()
     )
     assert seen == ["request-key"]
+
+
+def test_engine_uses_proxy_opener_when_provided(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _install_fake_media(monkeypatch, 10.0)
+    seen: list[object] = []
+
+    def fake_post(payload: dict, api_key: str, **kwargs: object) -> dict:
+        seen.append(kwargs.get("opener"))
+        return {"text": "ok", "segments": []}
+
+    engine = OpenRouterEngine(
+        proxy="http://proxy.example:8080", http_post=fake_post
+    )
+    engine.transcribe(_request(tmp_path), cancel=CancelToken())
+
+    assert len(seen) == 1
+    assert seen[0] is not None
+
+
+def test_engine_keeps_default_opener_without_proxy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _install_fake_media(monkeypatch, 10.0)
+    seen: list[object] = []
+
+    def fake_post(payload: dict, api_key: str, **kwargs: object) -> dict:
+        seen.append(("opener" in kwargs, kwargs.get("opener")))
+        return {"text": "ok", "segments": []}
+
+    engine = OpenRouterEngine(http_post=fake_post)
+    engine.transcribe(_request(tmp_path), cancel=CancelToken())
+
+    assert seen == [(True, None)]

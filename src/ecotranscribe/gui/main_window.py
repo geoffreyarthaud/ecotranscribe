@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
 from ..core.config import (
     AUDIO_EXTENSIONS,
     KEY_MISSING_MESSAGE,
+    OPENROUTER_API_URL,
     OPENROUTER_MODELS,
     VIDEO_EXTENSIONS,
 )
@@ -54,6 +55,7 @@ from .availability import build_info
 from .catalog import CatalogClient
 from .dialogs import DialogService
 from .duration import DurationProbe
+from . import network
 from .logging_setup import log_file_path
 from .pages.done import DonePage
 from .pages.home import HomePage
@@ -1056,4 +1058,7 @@ class MainWindow(QMainWindow):
     def _default_service(
         self, request: TranscribeRequest
     ) -> TranscribeService:
-        return TranscribeService({Provider.OPENROUTER: OpenRouterEngine()})
+        proxy = network.resolve_proxy_for(OPENROUTER_API_URL)
+        return TranscribeService(
+            {Provider.OPENROUTER: OpenRouterEngine(proxy=proxy)}
+        )

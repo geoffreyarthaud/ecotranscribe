@@ -467,3 +467,31 @@ def test_late_catalog_preserves_current_model(
     assert "remote/one" in models
     assert "remote/two" in models
     assert "remote/one" in pricing.fetched
+
+
+def test_default_service_injects_resolved_proxy(
+    qtbot, app_settings, monkeypatch
+) -> None:
+    from ecotranscribe.core.engines.openrouter import OpenRouterEngine
+    from ecotranscribe.gui import network
+
+    monkeypatch.setattr(
+        network, "resolve_proxy_for", lambda url: "http://pac.proxy:8080"
+    )
+    captured: list[str | None] = []
+
+    class CapturingEngine(OpenRouterEngine):
+        def __init__(
+            self, *, proxy: str | None = None, **kwargs: object
+        ) -> None:
+            captured.append(proxy)
+            super().__init__(proxy=proxy, **kwargs)
+
+    monkeypatch.setattr(
+        "ecotranscribe.gui.main_window.OpenRouterEngine", CapturingEngine
+    )
+
+    window, _service, _dialogs, _probe, _store = _window(qtbot, app_settings)
+    window._default_service(None)
+
+    assert captured == ["http://pac.proxy:8080"]

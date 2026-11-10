@@ -22,10 +22,11 @@ explicitement validée.
 - **Application desktop** : pas de `torch`, pas d'`openai-whisper`, pas de modèle local.
   Whisper reste disponible uniquement via l'extra `[whisper]` et n'est jamais
   importé par l'application desktop.
-- **Réseau** : au runtime, seules l'API OpenRouter et le catalogue statique
-  `catalog/models.json` (GitHub raw) sont contactés. Le catalogue ne transporte
-  ni audio, ni clé, ni identifiant utilisateur. Pas de télémétrie, pas de
-  vérification de mise à jour applicative.
+- **Réseau** : au runtime, seules l'API OpenRouter, le catalogue statique
+  `catalog/models.json` (GitHub raw) et, dans l'interface graphique, le
+  fichier PAC configuré par le système sont contactés. Le catalogue et le PAC
+  ne transportent ni audio, ni clé, ni identifiant utilisateur. Pas de
+  télémétrie, pas de vérification de mise à jour applicative.
 - **Secrets** : la clé OpenRouter ne doit apparaître ni dans les logs, ni dans
   `QSettings`, ni dans les détails d'erreur. Utiliser le keyring ou
   `OPENROUTER_API_KEY`.

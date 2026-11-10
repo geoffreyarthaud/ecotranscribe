@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.1 — 2026-11-10
+
+### Corrigé
+
+- Prise en charge des proxies PAC dans l'interface graphique : le proxy
+  système est résolu via Qt quand aucun proxy classique n'est configuré,
+  puis transmis au moteur OpenRouter. Le CLI et les configurations proxy
+  classiques (variables d'environnement, registre Windows, système macOS)
+  conservent leur comportement.
+
 ## 0.4.0 — 2026-11-09
 
 ### Ajouté

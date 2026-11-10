@@ -157,6 +157,7 @@ def _post_openrouter(
     on_log: LogCallback | None = None,
     timeout: float = OPENROUTER_REQUEST_TIMEOUT,
     max_retries: int = OPENROUTER_MAX_RETRIES,
+    opener: urllib.request.OpenerDirector | None = None,
 ) -> dict:
     """Envoie une requête STT avec retries transitoires, sans logger la clé."""
     data = json.dumps(payload).encode("utf-8")
@@ -172,7 +173,10 @@ def _post_openrouter(
             url, data=data, headers=headers, method="POST"
         )
         try:
-            with urllib.request.urlopen(request, timeout=timeout) as response:
+            open_url = (
+                opener.open if opener is not None else urllib.request.urlopen
+            )
+            with open_url(request, timeout=timeout) as response:
                 try:
                     decoded = json.load(response)
                 except json.JSONDecodeError as exc:
@@ -259,12 +263,20 @@ class OpenRouterEngine:
         sleep: Callable[[float], None] = time.sleep,
         timeout: float = OPENROUTER_REQUEST_TIMEOUT,
         max_retries: int = OPENROUTER_MAX_RETRIES,
+        proxy: str | None = None,
     ) -> None:
         self._api_url = api_url
         self._http_post = http_post or _post_openrouter
         self._sleep = sleep
         self._timeout = timeout
         self._max_retries = max_retries
+        self._opener = (
+            urllib.request.build_opener(
+                urllib.request.ProxyHandler({"http": proxy, "https": proxy})
+            )
+            if proxy
+            else None
+        )
 
     def availability(self) -> EngineAvailability:
         return EngineAvailability(True)
@@ -506,6 +518,7 @@ class OpenRouterEngine:
             on_log=on_log,
             timeout=self._timeout,
             max_retries=self._max_retries,
+            opener=self._opener,
         )
         cancel.raise_if_cancelled()
 
