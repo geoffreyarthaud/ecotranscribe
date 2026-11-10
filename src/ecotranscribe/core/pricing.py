@@ -7,14 +7,20 @@ from decimal import Decimal
 from typing import cast
 
 SECONDS_PER_HOUR = 3600.0
+# OpenRouter ne publie pas l'unité dans l'API endpoints. Les modèles facturés
+# à l'heure (MAI-Transcribe) sont deux ordres de grandeur au-dessus des
+# modèles facturés à la seconde (Voxtral, Whisper).
+_HOURLY_PRICE_MIN = 0.01
 
 
 def parse_hourly_price(payload: object) -> float | None:
     """Extrait le tarif horaire le plus bas d'une réponse d'endpoints.
 
-    Pour les modèles STT, ``pricing.prompt`` est exprimé en dollars par
-    seconde d'audio. Une valeur absente, non numérique, nulle ou infinie est
-    ignorée. Retourne ``None`` si aucun tarif exploitable n'est présent.
+    ``pricing.prompt`` est exprimé par seconde pour la plupart des modèles
+    STT, mais par heure pour certains fournisseurs (Azure/MAI-Transcribe).
+    L'unité n'étant pas exposée par l'API, un seuil sépare les deux familles.
+    Les endpoints facturés aux tokens (``completion`` non nul) sont ignorés :
+    leur coût dépend du texte produit, pas de la durée audio.
     """
     if not isinstance(payload, dict):
         return None
@@ -32,19 +38,35 @@ def parse_hourly_price(payload: object) -> float | None:
         pricing = cast("dict[str, object]", endpoint).get("pricing")
         if not isinstance(pricing, dict):
             continue
+        raw_completion = cast("dict[str, object]", pricing).get(
+            "completion", 0
+        )
+        try:
+            completion = float(raw_completion)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            completion = 0.0
+        if math.isfinite(completion) and completion > 0:
+            continue
+
         raw_price = cast("dict[str, object]", pricing).get("prompt")
         if not isinstance(raw_price, (int, float, str)):
             continue
         try:
-            per_second = float(raw_price)
+            unit_price = float(raw_price)
         except ValueError:
             continue
-        if math.isfinite(per_second) and per_second > 0:
-            prices.append(per_second)
+        if not (math.isfinite(unit_price) and unit_price > 0):
+            continue
+        hourly_price = (
+            unit_price
+            if unit_price >= _HOURLY_PRICE_MIN
+            else unit_price * SECONDS_PER_HOUR
+        )
+        prices.append(hourly_price)
 
     if not prices:
         return None
-    return min(prices) * SECONDS_PER_HOUR
+    return min(prices)
 
 
 def format_video_cost(hourly_price: float, duration_s: float) -> str:

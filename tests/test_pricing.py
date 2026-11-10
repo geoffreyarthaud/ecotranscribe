@@ -70,3 +70,32 @@ def test_format_video_cost(
     hourly_price: float, duration_s: float, expected: str
 ) -> None:
     assert format_video_cost(hourly_price, duration_s) == expected
+
+
+def test_parse_hourly_price_keeps_hourly_billed_models() -> None:
+    payload = {
+        "data": {
+            "endpoints": [
+                {"pricing": {"prompt": "0.1", "completion": "0"}},
+            ]
+        }
+    }
+
+    assert parse_hourly_price(payload) == pytest.approx(0.1)
+
+
+def test_parse_hourly_price_ignores_token_priced_models() -> None:
+    payload = {
+        "data": {
+            "endpoints": [
+                {
+                    "pricing": {
+                        "prompt": "0.0000025",
+                        "completion": "0.00001",
+                    }
+                },
+            ]
+        }
+    }
+
+    assert parse_hourly_price(payload) is None

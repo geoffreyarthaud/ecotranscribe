@@ -20,6 +20,13 @@
 - Le modèle sélectionné et les modèles récents restent disponibles lorsqu'ils
   disparaissent du catalogue.
 
+### Corrigé
+
+- Tarif estimé des modèles facturés à l'heure, comme
+  `microsoft/mai-transcribe-2` : le prix OpenRouter n'est plus multiplié par
+  3600. Les endpoints facturés aux tokens ne sont plus présentés comme un
+  tarif horaire.
+
 ## 0.3.0 — 2026-11-09
 
 ### Ajouté
