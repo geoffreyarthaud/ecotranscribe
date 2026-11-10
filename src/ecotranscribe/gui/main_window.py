@@ -762,8 +762,9 @@ class MainWindow(QMainWindow):
 
     def _start_worker(self, request: TranscribeRequest) -> None:
         self._cancel_token = CancelToken()
-        service = self._service_factory(request)
-        worker = TranscribeWorker(service, request, self._cancel_token)
+        worker = TranscribeWorker(
+            self._service_factory, request, self._cancel_token
+        )
         thread = QThread(self)
         worker.moveToThread(thread)
         thread.started.connect(worker.run)

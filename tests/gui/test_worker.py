@@ -65,7 +65,9 @@ def test_worker_emits_progress_log_and_finished(
     qtbot, tmp_path: Path
 ) -> None:
     service = FakeService()
-    worker = TranscribeWorker(service, _request(tmp_path), CancelToken())
+    worker = TranscribeWorker(
+        lambda request: service, _request(tmp_path), CancelToken()
+    )
     progress: list[ProgressUpdate] = []
     logs: list[str] = []
     finished: list[TranscribeResult] = []
@@ -85,7 +87,9 @@ def test_worker_emits_progress_log_and_finished(
 
 def test_worker_maps_cancellation(qtbot, tmp_path: Path) -> None:
     worker = TranscribeWorker(
-        FakeService("cancel"), _request(tmp_path), CancelToken()
+        lambda request: FakeService("cancel"),
+        _request(tmp_path),
+        CancelToken(),
     )
     seen: list[bool] = []
     worker.cancelled.connect(lambda: seen.append(True))
@@ -95,7 +99,9 @@ def test_worker_maps_cancellation(qtbot, tmp_path: Path) -> None:
 
 def test_worker_maps_expected_error(qtbot, tmp_path: Path) -> None:
     worker = TranscribeWorker(
-        FakeService("error"), _request(tmp_path), CancelToken()
+        lambda request: FakeService("error"),
+        _request(tmp_path),
+        CancelToken(),
     )
     failures: list[TranscribeError] = []
     worker.failed.connect(failures.append)
@@ -107,7 +113,9 @@ def test_worker_maps_expected_error(qtbot, tmp_path: Path) -> None:
 
 def test_worker_maps_unexpected_error(qtbot, tmp_path: Path) -> None:
     worker = TranscribeWorker(
-        FakeService("unexpected"), _request(tmp_path), CancelToken()
+        lambda request: FakeService("unexpected"),
+        _request(tmp_path),
+        CancelToken(),
     )
     failures: list[TranscribeError] = []
     worker.failed.connect(failures.append)
@@ -119,10 +127,41 @@ def test_worker_maps_unexpected_error(qtbot, tmp_path: Path) -> None:
 
 def test_worker_preserves_error_hint(qtbot, tmp_path: Path) -> None:
     worker = TranscribeWorker(
-        FakeService("hint"), _request(tmp_path), CancelToken()
+        lambda request: FakeService("hint"),
+        _request(tmp_path),
+        CancelToken(),
     )
     failures: list[TranscribeError] = []
     worker.failed.connect(failures.append)
     worker.run()
     assert len(failures) == 1
     assert failures[0].hint == "indice"
+
+
+def test_worker_factory_runs_on_worker_thread(
+    qtbot, tmp_path: Path
+) -> None:
+    from PySide6.QtCore import QThread
+    from PySide6.QtWidgets import QApplication
+
+    main_thread = QApplication.instance().thread()
+    seen: list[QThread] = []
+    service = FakeService()
+
+    def factory(request: TranscribeRequest) -> FakeService:
+        seen.append(QThread.currentThread())
+        return service
+
+    worker = TranscribeWorker(factory, _request(tmp_path), CancelToken())
+    finished: list[TranscribeResult] = []
+    worker.finished.connect(finished.append)
+    thread = QThread()
+    worker.moveToThread(thread)
+    thread.started.connect(worker.run)
+    worker.finished.connect(thread.quit)
+    thread.start()
+    qtbot.waitUntil(lambda: len(finished) == 1, timeout=3000)
+    thread.wait(3000)
+
+    assert seen
+    assert seen[0] is not main_thread

@@ -240,8 +240,8 @@ Sur macOS :
 
 ```bash
 bash packaging/sign_macos.sh "dist/EcoTranscribe Desktop.app"
-bash packaging/make_dmg.sh 0.4.0 arm64 "$(git rev-parse --short HEAD)" \
-  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" v0.4.0
+bash packaging/make_dmg.sh 0.4.1 arm64 "$(git rev-parse --short HEAD)" \
+  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" v0.4.1
 ```
 
 Windows : `packaging/make_windows.ps1` produit le ZIP portable et, si Inno

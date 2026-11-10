@@ -5,7 +5,7 @@ from pathlib import Path
 from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QLabel, QPushButton
 
-from ecotranscribe.core.config import OPENROUTER_MODEL
+from ecotranscribe.core.config import OPENROUTER_API_URL, OPENROUTER_MODEL
 from ecotranscribe.core.errors import EngineUnavailableError, TranscribeError
 from ecotranscribe.core.models import (
     OutputFormat,
@@ -475,9 +475,13 @@ def test_default_service_injects_resolved_proxy(
     from ecotranscribe.core.engines.openrouter import OpenRouterEngine
     from ecotranscribe.gui import network
 
-    monkeypatch.setattr(
-        network, "resolve_proxy_for", lambda url: "http://pac.proxy:8080"
-    )
+    seen_urls: list[str] = []
+
+    def fake_resolve(url: str) -> str:
+        seen_urls.append(url)
+        return "http://pac.proxy:8080"
+
+    monkeypatch.setattr(network, "resolve_proxy_for", fake_resolve)
     captured: list[str | None] = []
 
     class CapturingEngine(OpenRouterEngine):
@@ -495,3 +499,4 @@ def test_default_service_injects_resolved_proxy(
     window._default_service(None)
 
     assert captured == ["http://pac.proxy:8080"]
+    assert seen_urls == [OPENROUTER_API_URL]

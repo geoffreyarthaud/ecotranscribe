@@ -1,9 +1,9 @@
 # Installer EcoTranscribe Desktop sur macOS (binaire non notarié)
 
-EcoTranscribe Desktop 0.4.0.
+EcoTranscribe Desktop 0.4.1.
 
-Version 0.4.0 — build CI
-Commit : voir la release `v0.4.0` (`SHA256SUMS.txt` et notes de release).
+Version 0.4.1 — build CI
+Commit : voir la release `v0.4.1` (`SHA256SUMS.txt` et notes de release).
 Source : <https://github.com/geoffreyarthaud/ecotranscribe>
 
 Cette application est open-source (MIT). Le binaire macOS est **signé
@@ -16,8 +16,8 @@ lancement.
 Selon votre Mac :
 
 ```text
-ecotranscribe-desktop-macos-arm64-0.4.0.dmg   # Apple Silicon
-ecotranscribe-desktop-macos-x64-0.4.0.dmg     # Intel
+ecotranscribe-desktop-macos-arm64-0.4.1.dmg   # Apple Silicon
+ecotranscribe-desktop-macos-x64-0.4.1.dmg     # Intel
 ```
 
 Les archives ZIP sont fournies en fallback.
@@ -45,7 +45,7 @@ Les archives ZIP sont fournies en fallback.
 Télécharger `SHA256SUMS.txt` depuis la release, puis :
 
 ```bash
-shasum -a 256 "ecotranscribe-desktop-macos-arm64-0.4.0.dmg"
+shasum -a 256 "ecotranscribe-desktop-macos-arm64-0.4.1.dmg"
 # comparer avec la ligne correspondante de SHA256SUMS.txt
 ```
 
@@ -70,7 +70,7 @@ nouvelle version téléchargée peut nécessiter à nouveau cette étape.
 
 - Code source et workflow de build publics :
   <https://github.com/geoffreyarthaud/ecotranscribe>
-- Le binaire est produit par GitHub Actions à partir du tag `v0.4.0`.
+- Le binaire est produit par GitHub Actions à partir du tag `v0.4.1`.
 - La release publie `SHA256SUMS.txt`.
 - Le bundle embarque `ffmpeg`/`ffprobe` ; aucun `ffmpeg` système ni Python
   n'est requis.

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from PySide6.QtCore import QObject, Signal, Slot
 
 from ..core.errors import CancelledError, TranscribeError
@@ -18,20 +20,21 @@ class TranscribeWorker(QObject):
 
     def __init__(
         self,
-        service: TranscribeService,
+        service_factory: Callable[[TranscribeRequest], TranscribeService],
         request: TranscribeRequest,
         cancel: CancelToken,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
-        self._service = service
+        self._service_factory = service_factory
         self._request = request
         self._cancel = cancel
 
     @Slot()
     def run(self) -> None:
         try:
-            result = self._service.transcribe(
+            service = self._service_factory(self._request)
+            result = service.transcribe(
                 self._request,
                 on_progress=self.progress.emit,
                 on_log=self._on_log,

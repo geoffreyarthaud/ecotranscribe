@@ -57,12 +57,15 @@ utilise `opener.open` au lieu de `urllib.request.urlopen`.
 
 Une fonction `resolve_proxy_for(url: str) -> str | None` :
 
-1. Si `urllib.request.getproxies()` renvoie un dictionnaire non vide,
-   retourne `None` (le moteur utilisera le comportement par défaut).
+1. Si `urllib.request.getproxies()` contient une entrée pour le schéma
+   de l'URL (`https` pour OpenRouter), retourne `None` (le moteur
+   utilisera le comportement par défaut). Les entrées `no` et les
+   schémas non concernés sont ignorés.
 2. Sinon, interroge `QNetworkProxyFactory.systemProxyForQuery` avec
    `QNetworkProxyQuery(QUrl(url))`.
-3. Si le premier proxy retourné n'est pas `NoProxy`, retourne
-   `http://host:port` (ou `socks5://host:port` si le type le permet).
+3. Si un proxy de type `HttpProxy` est retourné, retourne
+   `http://host:port`. Les proxys SOCKS sont ignorés : `urllib` ne les
+   supporte pas sans dépendance supplémentaire.
 4. Sinon, retourne `None`.
 
 `MainWindow._default_service` appelle `resolve_proxy_for(OPENROUTER_API_URL)`
